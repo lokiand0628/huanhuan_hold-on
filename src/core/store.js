@@ -109,12 +109,16 @@ export function normalizeTimes(value) {
   const list = Array.isArray(value) ? value : String(value || '').split(/[,\s，、]+/);
   const out = [];
   for (const item of list) {
+    // 冒号可有可无：`22:00`、`2200`、`22`、`9` 都收。
+    // 时间框是个普通文本框（不用原生 type="time"，原因见 Tasks.js），
+    // 所以"少打一个冒号就被判格式错误"正是要消掉的那种摩擦 ——
+    // 桌面上敲 "2200" 比敲 "22:00" 少一个键。
     const m = String(item)
       .trim()
-      .match(/^(\d{1,2}):(\d{1,2})$/);
+      .match(/^(\d{1,2}):?(\d{0,2})$/);
     if (!m) continue;
     const hk = Number(m[1]);
-    const mk = Number(m[2]);
+    const mk = Number(m[2] || 0);
     if (hk > 23 || mk > 59) continue;
     const time = `${String(hk).padStart(2, '0')}:${String(mk).padStart(2, '0')}`;
     if (!out.includes(time)) out.push(time);

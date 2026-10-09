@@ -98,12 +98,14 @@ export function delegate(root, handlers) {
 
   // 键盘可达性靠原生控件：带 `data-act` 的元素**全部**是 `<button>` 或 `<input>`，
   // 前者本来就响应空格与回车，并派发一个真正的 click —— 走上面那条委托，不必另接。
-  //
-  // 这里原先有个 keydown 监听，是为旧版那个 `<div class="switch">` 补键盘用的。
-  // 开关早就换成 `<button role="switch">` 了，于是监听里每条分支都只会 return，
-  // 等于一个空监听（连它自己的注释都在说过时的话）。已删。
-  //
   // 给后来的人：**别把带 `data-act` 的元素写成 div** —— 那样会真的丢掉键盘操作。
+  //
+  // keydown 只服务"在输入框里敲回车等于点旁边那个按钮"这一类补充动作，
+  // 按 `键:keydown` 注册，没注册的控件完全不受影响。
+  // （这里曾有个只为旧版 `<div class="switch">` 补键盘的 keydown 监听；
+  // 开关换成 `<button role="switch">` 之后它就空转了，已经删掉。
+  // 现在这条是重新加的，用途不同。）
+  root.addEventListener('keydown', dispatch(':keydown'));
 }
 
 /**

@@ -7,6 +7,7 @@
  *
  * `?fast=1` 把一分钟压成一秒，用来快速看到提醒真的弹出来。
  */
+import { LINKS } from './links.js';
 
 const LS_SETTINGS = 'mock.settings';
 const LS_LOCK = 'mock.lock';
@@ -319,7 +320,7 @@ export function createMock(params) {
       // 才是唯一有界面变化的分支，回"已是最新"就什么都看不见了。
       return {
         latest: '9.9.9',
-        url: 'https://github.com/lokiand0628/huanhuan_hold-on/releases',
+        url: LINKS.releases,
       };
     },
     async relaunch() {

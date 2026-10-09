@@ -37,6 +37,9 @@ export const S = {
   scheduleInterval: '每隔多久',
   scheduleDaily: '每天几点',
   taskInterval: '间隔',
+  // 「每天几点」那一行自己的标题。以前它跟上面的分段控件共用
+  // 「什么时候提醒」—— 同一个标题在一屏里出现两次，看着像渲染错了。
+  taskTimes: '提醒时间',
   addTime: '加一个时间',
   timePlaceholder: '例如 22:00',
   taskMode: '提醒方式',
@@ -91,6 +94,19 @@ export const S = {
   version: v => `版本 ${v}`,
   checkUpdate: '检查更新',
 
+  // 「关于作者」这两行是给用户一个能找着人的地方：这是个自用小工具，
+  // 但既然发出去了，就得让人知道是谁写的、去哪儿提问题。
+  aboutAuthor: '关于作者',
+  authorName: '砖头',
+  authorProject: '项目地址',
+  authorHome: 'GitHub 主页',
+  quickStar: '快捷标星',
+  quickStarDesc: '如果它帮到你了，去 GitHub 点个 star 吧',
+  quickStarAction: '去标星',
+  // 标星只能人自己点 —— 这里能做的只是把页面送到他面前，
+  // 所以得说清楚"接下来点哪儿"，不然打开一个满屏文字的仓库页等于没帮上忙。
+  toastStarHint: '在打开的页面右上角点一下 ⭐ Star 就标上了',
+
   /* ---- 居中浮窗 ---- */
   reminderConfirm: '知道了',
   // 以前是「稍后再说 (2)」，那个括号里的数字是"还剩几次"，但看着像倒计时。
@@ -127,7 +143,8 @@ export const S = {
 
   /* ---- 提示 ---- */
   toastDeleted: '已删除',
-  toastBadTime: '时间格式不对，像 22:00 这样写',
+  toastNoTime: '先选一个时间',
+  toastBadTime: '时间格式不对，像 22:00 或 2200 这样写',
   toastDupeTime: '这个时间已经加过了',
 };
 

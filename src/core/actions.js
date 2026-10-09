@@ -23,8 +23,10 @@ import {
   DURATION_UNITS,
 } from './store.js';
 import { saveSettings } from './persist.js';
+import { LINKS } from './links.js';
 import { S, taskTitle } from './strings.js';
 import { acceptInput, syncGate } from '../views/Gate.js';
+import { focusTimeInput } from '../views/Tasks.js';
 
 const SWITCHES = {
   'toggle-sound': 'soundEnabled',
@@ -94,6 +96,44 @@ export function createActions(ctx) {
     if (unit) task.durationUnit = unit;
     await commit({ resync: false });
     render();
+  }
+
+  /**
+   * 定点时间：把输入框里的时间加进这个提醒，点按钮和敲回车共用这一条。
+   *
+   * 值从**输入框现读**，草稿只是"重绘之后把值填回去"用的备份 ——
+   * 反过来让草稿盖掉控件里刚选好的时间，就会加进去一个上一次的旧值。
+   */
+  async function addTime(button) {
+    const task = taskById(button.dataset.id);
+    if (!task) return;
+    const input = button.parentElement.querySelector('[data-act="time-draft"]');
+    const raw = input?.value || state.timeDrafts[task.id] || '';
+    if (!raw) {
+      toast(S.toastNoTime, 'warning');
+      return;
+    }
+    const times = normalizeTimes(raw);
+    if (!times.length) {
+      toast(S.toastBadTime, 'warning');
+      return;
+    }
+    // 框里写了几个就加几个。这个框的提示语是「例如 22:00」，看着像只能写一个，
+    // 但 normalizeTimes 本来就认逗号/空格分隔的一串 —— 只取第一个的话，
+    // 粘进去 "9,12,18" 会静默只加 9:00，那是在骗人。
+    const fresh = times.filter(time => !task.dailyTimes.includes(time));
+    if (!fresh.length) {
+      toast(S.toastDupeTime, 'warning');
+      return;
+    }
+    task.dailyTimes = normalizeTimes([...task.dailyTimes, ...fresh]);
+    state.timeDrafts[task.id] = '';
+    await commit();
+    await api.resetTask(task.id);
+    render();
+    // 重绘把整个时间行换成新的了，焦点会掉回 body —— 扶回输入框，
+    // 好让人接着加下一个时间点。
+    focusTimeInput(task.id);
   }
 
   const handlers = {
@@ -166,6 +206,9 @@ export function createActions(ctx) {
       await commit();
       await api.resetTask(task.id);
       render();
+      // 切到「每天几点」的人，下一步一定是打一个时间。先把光标放进时间框，
+      // 免得又要伸手去点一下 —— 点这个分段控件本身就说明"我要定时间点了"。
+      if (next === 'daily') focusTimeInput(task.id);
     },
 
     async 'set-mode'(el) {
@@ -190,26 +233,16 @@ export function createActions(ctx) {
       state.timeDrafts[el.dataset.id] = el.value;
     },
 
-    async 'add-time'(el) {
-      const task = taskById(el.dataset.id);
-      if (!task) return;
-      const input = el.parentElement.querySelector('[data-act="time-draft"]');
-      const raw = state.timeDrafts[task.id] ?? input?.value ?? '';
-      const times = normalizeTimes(raw);
-      if (!times.length) {
-        toast(S.toastBadTime, 'warning');
-        return;
-      }
-      if (task.dailyTimes.includes(times[0])) {
-        toast(S.toastDupeTime, 'warning');
-        return;
-      }
-      task.dailyTimes = normalizeTimes([...task.dailyTimes, times[0]]);
-      state.timeDrafts[task.id] = '';
-      await commit();
-      await api.resetTask(task.id);
-      render();
+    // 在时间框里敲回车 = 点旁边那个「加一个时间」。
+    // 定点时间是一串连着加的，敲完一个回车就能接着敲下一个，中间不用去够鼠标。
+    'time-draft:keydown'(el, event) {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const button = el.parentElement.querySelector('[data-act="add-time"]');
+      if (button) addTime(button);
     },
+
+    'add-time': el => addTime(el),
 
     async 'quick-time'(el) {
       const task = taskById(el.dataset.id);
@@ -414,6 +447,31 @@ export function createActions(ctx) {
         toast(S.updateLatest, 'success');
       }
       render();
+    },
+
+    /* ---- 关于作者：三条都是"开浏览器"，都不写盘、不重绘 ---- */
+
+    'open-repo'() {
+      api.openExternal(LINKS.repo);
+    },
+
+    'open-author'() {
+      api.openExternal(LINKS.author);
+    },
+
+    /**
+     * 快捷标星。
+     *
+     * 标星这个动作**只能在 GitHub 页面上点**，没有 API 可以代劳（也不该代劳 ——
+     * 拿 token 替用户点 star 是刷量）。所以这里做的全部事情就是把人送过去，
+     * 再用一句提示告诉他到了该点哪儿：直接甩一个仓库首页过去，
+     * 满屏都是文件和说明，反而找不着那个按钮。
+     */
+    'quick-star'() {
+      // 先出提示再开浏览器，和「检查更新」同一个道理：跳转是异步的，
+      // 提示不上屏的话用户会以为按钮坏了。
+      toast(S.toastStarHint);
+      api.openExternal(LINKS.repo);
     },
 
     /* ============================== 居中浮窗 ============================== */

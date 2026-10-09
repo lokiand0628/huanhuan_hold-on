@@ -135,6 +135,28 @@ export function renderSettings({ autostartBusy }) {
           { class: 'btn btn-ghost btn-sm', dataset: { act: 'check-update' } },
           icon('refresh', { size: 15 })
         )
+      ),
+      // 「关于作者」放在最后：先交代这东西是什么版本、新不新，
+      // 再交代是谁做的。顺序反了会显得像在推销。
+      row(
+        S.aboutAuthor,
+        S.authorName,
+        h(
+          'div',
+          { class: 'row-actions' },
+          linkButton('open-repo', S.authorProject),
+          linkButton('open-author', S.authorHome)
+        )
+      ),
+      row(
+        S.quickStar,
+        S.quickStarDesc,
+        h(
+          'button',
+          { class: 'btn btn-ghost btn-sm', dataset: { act: 'quick-star' } },
+          icon('star', { size: 15 }),
+          S.quickStarAction
+        )
       )
     )
   );
@@ -159,6 +181,29 @@ function row(label, sub, control) {
     { class: 'row' },
     h('div', { class: 'row-text' }, h('b', null, label), sub ? h('small', null, sub) : null),
     control ? h('div', { class: 'row-ctl' }, control) : null
+  );
+}
+
+/**
+ * 一个会开浏览器的小按钮。
+ *
+ * 刻意**不用 `<a href>`**：这里跑在 Tauri 的 webview 里，让它自己导航会把整个
+ * 界面顶掉（外链在应用内打开，而且回不来）。开浏览器只有 `open_external_url`
+ * 一条路，所以外观上做成按钮，行为上走 data-act。
+ *
+ * 用 btn-text 而不是 btn-ghost：这一排要是摆两个带 2px 描边和厚度的按钮，
+ * 会比上面的「检查更新」还抢眼，而它们恰恰是最不需要被点的那两个。
+ * 规范里 btn-text 的定位就是"次要到不该被误点"，下划线本身也已经在说"这是个链接"。
+ *
+ * 图标在文字**后面**：图在前会把两个标签的左边缘推得参差不齐，
+ * 而"带外链小箭头"这个收尾的形状，本来就比开头更像"点了会离开这里"。
+ */
+function linkButton(act, label) {
+  return h(
+    'button',
+    { class: 'btn btn-text btn-sm', dataset: { act } },
+    label,
+    icon('external', { size: 13 })
   );
 }
 

@@ -14,6 +14,7 @@ import { open as openDialog, ask } from '@tauri-apps/plugin-dialog';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { createMock } from './mock.js';
+import { REPO_SLUG } from './links.js';
 
 const params = new URLSearchParams(location.search);
 const IS_MOCK = params.get('mock') === '1';
@@ -25,8 +26,10 @@ const IS_MOCK = params.get('mock') === '1';
  * 是上游项目的、私钥不在手上 —— 留着它，用户点一下就会被拉去装上游的包。
  * 现在改成查 GitHub 的 latest release，有新版就把人送到仓库页面自己下。
  * 代价是没有静默升级；换来的是不用保管私钥，也不会装错东西。
+ *
+ * 地址来自 links.js：设置页的「关于作者」也指向同一个仓库，两处不能各写一份。
  */
-const REPO = 'lokiand0628/huanhuan_hold-on';
+const REPO = REPO_SLUG;
 
 const safe = (fn, fallback = null) =>
   fn().catch(err => {

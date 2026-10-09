@@ -136,7 +136,13 @@ function renderCard(task) {
       },
     },
     top,
-    renderQuickIntervals(task)
+    // 定点任务的芯片行**展开时收起来**：展开区里的「提醒时间」是同一排
+    // 芯片（同样是那几个时间点），两排上下挨着，看着像渲染了两遍。
+    // 这一行本来就是给"没展开时瞥一眼 / 顺手改"用的，展开了就没它的事了。
+    //
+    // 间隔任务不收起：那边展开区里是步进器，芯片是"一下点到 30 分"的快捷
+    // 方式 —— 是不同的控件，不是同一份东西的副本。
+    expanded && isDaily(task) ? null : renderQuickIntervals(task)
   );
 
   if (expanded) card.append(renderBody(task));
@@ -193,7 +199,9 @@ function renderBody(task) {
     field(S.taskName, nameInput(task)),
     field(S.taskIcon, iconPicker(task)),
     field(S.taskSchedule, schedulePicker(task)),
-    isDaily(task) ? field(S.taskSchedule, timePicker(task)) : field(S.taskInterval, stepperFor(task, 'interval', 1, 1440, S.minutes)),
+    // 注意这两个标题不能都用 S.taskSchedule：那样一屏里会出现两个
+    // 「什么时候提醒」，紧挨着，看着像界面坏了。
+    isDaily(task) ? field(S.taskTimes, timePicker(task)) : field(S.taskInterval, stepperFor(task, 'interval', 1, 1440, S.minutes)),
     field(
       S.taskMode,
       frag(
@@ -207,7 +215,12 @@ function renderBody(task) {
     task.reminderMode === 'lock' ? field(S.taskLockDuration, durationPicker(task)) : null,
     field(S.taskPreNotify, stepperFor(task, 'preNotificationSeconds', 0, 300, S.seconds)),
     field(S.taskSnooze, stepperFor(task, 'snoozeMinutes', 1, 120, S.minutes)),
-    field(S.taskMaxSnooze, stepperFor(task, 'maxSnooze', 0, 10, S.times)),
+    // 「可推迟几次」只对锁屏强制有效：软提醒（居中浮窗）现在**只给一次**推迟，
+    // 根本不看这个数（见 main.js 算 canSnooze 的地方）。摆一个不起作用的设置
+    // 比不摆更糟 —— 用户会以为调大它就能多推几次。
+    task.reminderMode === 'lock'
+      ? field(S.taskMaxSnooze, stepperFor(task, 'maxSnooze', 0, 10, S.times))
+      : null,
     h(
       'button',
       { class: 'btn btn-ghost btn-sm', dataset: { act: 'delete-task', id: task.id } },
@@ -308,11 +321,22 @@ function timePicker(task) {
     h(
       'div',
       { class: 'chips' },
+      // 这里**试过**用原生 `<input type="time">`，又退回文本框了。
+      // 原因是 WKWebView 给空的 time 输入框渲染了一句灰色的占位数字
+      // （实测是 "12:30"），看着就像一个已经填好的值 —— 用户直接点
+      // 「加一个时间」，会撞上"先选一个时间"，而框里明明写着 12:30。
+      // 一个会撒谎的输入框，比多敲两下键盘糟得多。
+      //
+      // 真正的摩擦其实在"必须打那个冒号"上，而那个已经在 `normalizeTimes`
+      // 里解决了（22:00 / 2200 / 9 都认）—— 桌面键盘上敲 "2200" 比敲
+      // "22:00" 少一个键，比去够一个原生选择器也快。
       h('input', {
         class: 'input',
         type: 'text',
         inputmode: 'numeric',
         placeholder: S.timePlaceholder,
+        value: state.timeDrafts[task.id] || '',
+        'aria-label': S.addTime,
         style: { width: '110px', minHeight: '32px' },
         dataset: { act: 'time-draft', id: task.id },
       }),
@@ -323,6 +347,22 @@ function timePicker(task) {
       )
     )
   );
+}
+
+/**
+ * 整棵重绘之后，把光标放回某个提醒的时间框。
+ *
+ * 定时间点通常是一串连着加的（09:00 一个、12:00 又一个），而重绘会把
+ * 输入框整个换成新的、焦点掉回 body —— 不扶一下的话，每加一个都得
+ * 重新点一次输入框。按 id 找而不是拼属性选择器，省得给 id 做转义。
+ */
+export function focusTimeInput(taskId) {
+  for (const el of document.querySelectorAll('[data-act="time-draft"]')) {
+    if (el.dataset.id === taskId) {
+      el.focus();
+      return;
+    }
+  }
 }
 
 /* ============================== 通用控件 ============================== */
