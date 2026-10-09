@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  NODE_OPTIONS: --use-system-ca
+
+jobs:
+  release:
+    # 只出 Apple Silicon。没有 Windows/Linux 矩阵，也没有 scoop manifest 要回写。
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # tauri-action refuses to run when a release for the tag already exists.
+      # Deleting first makes a re-run of the same tag idempotent instead of a red X.
+      - name: Remove stale release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete "${{ github.ref_name }}" --repo "${{ github.repository }}" --yes || true
+
+      - name: Build and release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 缓缓 ${{ github.ref_name }}
+          releaseBody: |
+            ## 缓缓 ${{ github.ref_name }}
+
+            macOS (Apple Silicon) 专用。下载下面的 `.dmg`，打开后把「缓缓」拖进「应用程序」。
+
+            ### 首次打开被拦下
+
+            这个包没有 Apple 开发者签名，也没有公证，所以第一次打开会提示「无法验证开发者」。
+            在「终端」里跑一次即可：
+
+            ```bash
+            xattr -dr com.apple.quarantine /Applications/缓缓.app
+            ```
+
+            或者在「访达」里右键点「缓缓」→「打开」→ 再点一次「打开」。
+
+            ### 完整更新说明
+
+            见 [README](https://github.com/${{ github.repository }}#版本记录)。
+          releaseDraft: false
+          prerelease: false
+          # createUpdaterArtifacts 已关（见 tauri.conf.json），所以不需要
+          # TAURI_SIGNING_PRIVATE_KEY，也不会产出 latest.json。
+          args: --target aarch64-apple-darwin --bundles dmg

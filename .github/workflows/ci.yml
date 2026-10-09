@@ -1,0 +1,60 @@
+name: CI
+
+# 只跑 macOS：这个项目只出 Apple Silicon 的包，Windows/Linux 上跑绿了也不代表
+# 发布产物是对的。macos-latest 现在是 arm64 镜像。
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+
+env:
+  NODE_OPTIONS: --use-system-ca
+
+jobs:
+  check:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Tauri backend
+        working-directory: src-tauri
+        run: cargo check
+
+      # 锁屏补偿那几个单测是「强制」这块唯一能自动验的部分，别只 check 不 test。
+      - name: Test Tauri backend
+        working-directory: src-tauri
+        run: cargo test

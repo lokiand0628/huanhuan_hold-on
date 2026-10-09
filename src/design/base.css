@@ -1,0 +1,192 @@
+/**
+ * 基础层：重置、页面骨架、排版基元
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--surface-base);
+  color: var(--ink-primary);
+  font-family: var(--font-primary);
+  font-size: var(--type-body);
+  font-weight: var(--weight-regular);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  /* 桌面应用不该能选中界面文字；真正要选的地方单开 user-select */
+  user-select: none;
+  cursor: default;
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+/* 数字一律等宽：倒计时跳秒不抖，这是"像素级"里最显眼的一条 */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* 键盘可达性：焦点必须看得见。旧版的 .switch 是个 div，键盘完全够不着。 */
+:focus-visible {
+  outline: 3px solid var(--accent-line);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+
+/* ---------- 应用外壳 ---------- */
+
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 外壳：一页内容 + 底部页签。页签常驻，不随页面滚动。 */
+.shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-page) var(--space-page) var(--space-emphasis);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-group);
+}
+
+/* 关键：列布局的默认 flex-shrink 是 1，卡片会被**压扁**而不是让页面滚动。
+   设置页因此出现过分组互相重叠。内容高度必须由自己决定。 */
+.page > * {
+  flex: none;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-related);
+}
+
+.page-head h1 {
+  font-size: var(--type-title);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.01em;
+  flex: 1;
+}
+
+.page-head .page-sub {
+  font-size: var(--type-detail);
+  color: var(--ink-tertiary);
+  font-weight: var(--weight-regular);
+}
+
+/* ---------- 沉浸式标题栏 ---------- */
+
+/* 窗口用 Overlay 标题栏 + 隐藏标题（见 tauri.conf.json），红绿灯直接浮在内容上，
+   所以顶部要留一条空白给它们。这条空白同时是**唯一的窗口拖拽区** ——
+   Overlay 模式下系统不再提供可拖的标题栏，少了它窗口就拖不动。
+   只作用于主窗口：锁屏和居中浮窗走别的路由。 */
+body[data-route='main'] .titlebar {
+  flex: none;
+  height: 30px;
+  -webkit-app-region: drag;
+}
+
+/* 拖拽区会把子元素的鼠标事件一起吃掉，所以要显式把它们排除在外。
+   目前这条空白里没有控件，留着是为了以后往里放东西时不踩坑。 */
+body[data-route='main'] .titlebar button,
+body[data-route='main'] .titlebar input {
+  -webkit-app-region: no-drag;
+}
+
+/* ---------- 滚动条：细、低对比，别抢内容 ---------- */
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid var(--surface-base);
+  border-radius: var(--radius-chip);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-tertiary);
+}
+
+/* ---------- 路由外壳 ---------- */
+
+/* 居中浮窗：无边框窗口，透明底 + 圆角卡片 + 弥散阴影。
+   需要窗口本身 `transparent(true)`，否则圆角外面是块白。 */
+body[data-route="reminder"] {
+  background: transparent;
+}
+
+body[data-route="reminder"] #app {
+  padding: 14px;
+}
+
+/* 锁屏：全屏、暗色。这是唯一一处暗色，不走 token 切换 —— 就一套暗色值。 */
+body[data-route="lock"] {
+  background: #16181d;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+/* 锁屏的暗色子集：只定义锁屏真的用到的，不做通用暗色主题 */
+body[data-route="lock"] {
+  --lock-bg: #16181d;
+  --lock-card: #1e2128;
+  /* 比卡片再深一档：输入框、闸门文本这类"陷进去"的表面 */
+  --lock-sunken: #12141a;
+  --lock-line: #2b313c;
+  --lock-ink: #ffffff;
+  --lock-ink-dim: #9aa4b2;
+}

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="512" height="512" role="img" aria-label="缓缓">
+  <title>缓缓</title>
+
+  <!--
+    品牌标记：两条圆角竖条 = 暂停。
+
+    「缓缓」这个名字说的就是"停一下"，暂停键是这件事最没有歧义的图形 ——
+    不需要先认识这个 app 才看得懂。
+
+    透明底。这里画的是**标记**，不是应用图标：图标（蓝底圆角方块 + 白色竖条）
+    见 src-tauri/icons/icon.svg 与生成出来的 icon.icns/icon.png。
+    分开是有意的 —— 标记要能落在任意底色上，图标得自己带底色。
+
+    每个形状都必须有圆角（Duolingo 规范里尖锐形状属于 off-brand），
+    所以这里没有直角。椭圆是规范点名的禁忌（它会暗示透视），也没有。
+  -->
+  <g fill="#1cb0f6">
+    <rect x="6.2" y="5" width="4.6" height="14" rx="2.3" />
+    <rect x="13.2" y="5" width="4.6" height="14" rx="2.3" />
+  </g>
+</svg>

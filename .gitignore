@@ -1,0 +1,34 @@
+# 依赖目录
+node_modules/
+dist/
+
+# 锁定文件（需要保留用于 CI/CD）
+# package-lock.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE 文件
+.vscode/
+.idea/
+
+# Tauri 构建产物
+src-tauri/target/
+src-tauri/gen/
+
+# 签名密钥 —— 即便是历史遗留，也永远不要提交
+.tauri-keys
+.tauri-keys.pub
+*.key
+*.pem
+
+# 环境变量（包含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 本地工具配置
+.claude/
+
+*.docx

@@ -1,0 +1,65 @@
+[package]
+name = "health-reminder"
+version = "0.0.1"
+description = "Hold On（缓缓）— 事缓则圆，不着急"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "desk_reminder_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# macos-private-api：无边框的「居中浮窗」要透明底（圆角外面不能是一块白）。
+# 在 macOS 上开透明窗口必须走这个 feature，配套 tauri.conf.json 的 macOSPrivateApi。
+# 注意这里只加 feature，**不要**动版本 —— 详见文件末尾关于依赖漂移的注释。
+tauri = { version = "2", features = ["protocol-asset", "tray-icon", "macos-private-api"] }
+tauri-plugin-shell = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "5"
+url = "2"
+# 这一版**移除了** tauri-plugin-updater：更新器要一对签名密钥，而上游那对
+# 的私钥不在手上，公钥留着只会把用户引去拉原项目的包。现在改成"只问一句
+# GitHub 上有没有更新的 tag，有就把人引到 release 页"，纯前端 fetch 就够。
+tauri-plugin-process = "2.3.1"
+tauri-plugin-dialog = "2"
+chrono = "0.4"
+rodio = "0.21.1"
+# 精确钉住：2.4+ 要求 tauri ^2.10、2.5+ 要求 ^2.12，会让 cargo 顺手把整个
+# Tauri 框架升上去（试过一次，tauri 2.9.5 一路被拽到 2.12.2）。
+# 用 `=` 是为了让将来误升时**报错**而不是静默升级框架。
+tauri-plugin-single-instance = "=2.3.7"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Foundation_Collections", "Media_Control", "Win32_System_RemoteDesktop", "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading", "Win32_System_Com", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_Graphics_Gdi", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_SystemInformation"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"
+# 指纹/开机密码验证（LAContext）。四支都用 `=` 钉死，且都取 lock 里**已有**的
+# 版本：objc2-local-authentication 0.3.2 要 objc2 >=0.6.2,<0.8.0 与
+# objc2-foundation ^0.3.2 —— 正好对得上，所以加进来只多一个 crate，
+# 不会把 Tauri 那棵树拽动（实测 diff：只删掉 updater 的依赖，零升级）。
+objc2-local-authentication = "=0.3.2"
+# LAContext 的 reply 是个 block。objc2 不重导出 block2，得单独声明。
+# 版本必须与 objc2 0.6 用的那支一致，否则会并排出现两份 block2。
+block2 = "=0.6.2"
+# 直接用这两个：前者要 `msg_send!` / `Bool` / `Retained`，后者要 `NSString`。
+# default-features = false 不会"关掉"别处已开的 feature（cargo 是取并集），
+# 只是不在这里多要。
+objc2 = "=0.6.5"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = [
+    "std",
+    "NSString",
+    "NSError",
+    "NSObject",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11 = { version = "2.21", features = ["xlib", "xss"] }
+# 移除了不再需要的 notify-rust

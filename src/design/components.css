@@ -1,0 +1,1204 @@
+/**
+ * 组件层
+ *
+ * 三条贯穿全文件的规矩：
+ *   1. 可按压的东西才有"接触式厚度"（底部实心阴影），按下时厚度收掉、整体下沉 2px。
+ *      浮层用真正的弥散阴影。两者不混用。
+ *   2. 身份色（4 个任务色）只出现在图标气泡和小圆点上。按钮、边框、分组底色一律
+ *      不用它 —— 否则屏幕上同时有四种饱和色在喊。
+ *   3. 绿色只表示「完成 / 成功」。开关的"开"是蓝色。
+ */
+
+/* ============================== 按钮 ============================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-tight);
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  font-size: var(--type-heading);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0;
+  transition: transform var(--motion-press) ease, box-shadow var(--motion-press) ease,
+    background-color var(--motion-press) ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(3px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--ink-inverse);
+  box-shadow: var(--depth-accent);
+}
+
+.btn-primary:active:not(:disabled) {
+  box-shadow: var(--depth-accent-press);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: var(--ink-inverse);
+  box-shadow: var(--depth-danger);
+}
+
+.btn-danger:active:not(:disabled) {
+  box-shadow: var(--depth-danger-press);
+}
+
+/* 次级：白底 + 2px 描边 + 同样的厚度。Duolingo 的经典"第二按钮"。 */
+.btn-ghost {
+  background: var(--surface-card);
+  color: var(--ink-secondary);
+  border: 2px solid var(--line);
+  box-shadow: var(--depth-ghost);
+}
+
+.btn-ghost:active:not(:disabled) {
+  box-shadow: var(--depth-ghost-press);
+}
+
+/* 文字按钮：没有厚度，用于"次要到不该被误点"的动作 */
+.btn-text {
+  min-height: 32px;
+  padding: 0 10px;
+  color: var(--ink-tertiary);
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-control);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+.btn-text:hover {
+  color: var(--ink-secondary);
+  background: var(--surface-sunken);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: var(--type-body);
+}
+
+/* ============================== 开关 ============================== */
+
+.switch {
+  flex: none;
+  width: 54px;
+  height: 32px;
+  border-radius: var(--radius-chip);
+  background: var(--surface-sunken);
+  border: 2px solid var(--line-strong);
+  position: relative;
+  transition: background-color var(--motion-press) ease, border-color var(--motion-press) ease;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--surface-card);
+  box-shadow: 0 2px 0 rgba(75, 75, 75, 0.16);
+  transition: transform var(--motion-enter) var(--ease-enter);
+}
+
+.switch[aria-checked="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.switch[aria-checked="true"]::after {
+  transform: translateX(22px);
+}
+
+/* ============================== 分段控件 ============================== */
+
+.segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-control);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
+  font-size: var(--type-detail);
+  font-weight: var(--weight-bold);
+  color: var(--ink-secondary);
+  white-space: nowrap;
+  transition: background-color var(--motion-press) ease, color var(--motion-press) ease;
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--surface-card);
+  color: var(--accent-ink);
+  box-shadow: 0 2px 0 rgba(75, 75, 75, 0.1);
+}
+
+/* ============================== 芯片（快捷间隔） ============================== */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-tight);
+}
+
+.chip {
+  min-height: 32px;
+  padding: 0 13px;
+  border-radius: var(--radius-chip);
+  border: 2px solid var(--line);
+  background: var(--surface-card);
+  color: var(--ink-secondary);
+  font-size: var(--type-detail);
+  font-weight: var(--weight-bold);
+  transition: border-color var(--motion-press) ease, color var(--motion-press) ease,
+    background-color var(--motion-press) ease;
+}
+
+.chip:hover {
+  border-color: var(--accent-line);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.chip-add {
+  border-style: dashed;
+  color: var(--ink-tertiary);
+}
+
+/* 定点时间用的胶囊，带一个删除叉 */
+.chip-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 7px;
+}
+
+.chip-time .x {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  line-height: 1;
+  background: var(--line);
+  color: var(--ink-secondary);
+}
+
+.chip-time .x:hover {
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+/* ============================== 图标选择器 ============================== */
+
+/* 8 列，24 个图标正好三行。方形 + 等距，比胶囊更容易一眼扫完。 */
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+.icon-pick {
+  aspect-ratio: 1;
+  border-radius: var(--radius-control);
+  border: 2px solid var(--line);
+  background: var(--surface-card);
+  /* 未选中一律中性灰。24 个图标各显各的颜色会非常吵，
+     规范的"配色取少不取多"要求颜色只在需要指认的地方出现。 */
+  color: var(--ink-secondary);
+  display: grid;
+  place-items: center;
+  transition: border-color var(--motion-press) ease, color var(--motion-press) ease,
+    background-color var(--motion-press) ease;
+}
+
+.icon-pick:hover {
+  border-color: var(--accent-line);
+  color: var(--ink-primary);
+}
+
+/* 选中态用**该图标所属分类的颜色**，不是一律主蓝 ——
+   选完立刻看到这张卡最终会是什么色，而且顺手把"颜色 = 分类"教会用户。
+   四个分类色各写一条，和上面 .icon-bubble 用的是同一组 token。 */
+.icon-pick[aria-checked="true"][data-color="sit"] {
+  color: var(--id-sit);
+  border-color: var(--id-sit);
+  background: color-mix(in srgb, var(--id-sit) 14%, #ffffff);
+}
+
+.icon-pick[aria-checked="true"][data-color="water"] {
+  color: var(--id-water);
+  border-color: var(--id-water);
+  background: color-mix(in srgb, var(--id-water) 14%, #ffffff);
+}
+
+.icon-pick[aria-checked="true"][data-color="eye"] {
+  color: var(--id-eye);
+  border-color: var(--id-eye);
+  background: color-mix(in srgb, var(--id-eye) 14%, #ffffff);
+}
+
+.icon-pick[aria-checked="true"][data-color="custom"] {
+  color: var(--id-custom);
+  border-color: var(--id-custom);
+  background: color-mix(in srgb, var(--id-custom) 14%, #ffffff);
+}
+
+.icon-pick svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ============================== 步进器 ============================== */
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-control);
+  padding: 3px;
+}
+
+.stepper button {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  font-size: 18px;
+  font-weight: var(--weight-bold);
+  color: var(--ink-secondary);
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.stepper button:hover:not(:disabled) {
+  background: var(--surface-card);
+  color: var(--accent-ink);
+}
+
+.stepper button:disabled {
+  opacity: 0.35;
+}
+
+/* 输入外观只有一种：白底、2px 描边、等宽数字。旧版步进是灰胶囊、
+   其它输入是白底，两套外观并存。 */
+/* 休息时长那一行不是步进器：数字框 + 秒/分钟/小时三选一。
+   它的输入框必须和步进器长得**一模一样** —— 同一页里两种输入外观，
+   正是上一版被修掉的问题。所以外观写在共享选择器里，只有宽度分开。 */
+.stepper input,
+.duration-row input {
+  height: 32px;
+  text-align: center;
+  background: var(--surface-card);
+  border: 2px solid var(--line);
+  border-radius: 9px;
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+
+.stepper input {
+  width: 52px;
+}
+
+/* 「720 分钟」这种要放得下 */
+.duration-row input {
+  width: 78px;
+}
+
+.stepper input::-webkit-outer-spin-button,
+.stepper input::-webkit-inner-spin-button,
+.duration-row input::-webkit-outer-spin-button,
+.duration-row input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepper input:focus,
+.duration-row input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.stepper .unit {
+  font-size: var(--type-detail);
+  color: var(--ink-tertiary);
+  font-weight: var(--weight-medium);
+  padding-right: 6px;
+}
+
+/* 数字框 + 单位分段，同宽同高对齐在一行上 */
+.duration-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-tight);
+}
+
+.duration-row .segmented {
+  flex: 1;
+}
+
+/* ============================== 文本输入 ============================== */
+
+.input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  background: var(--surface-card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-control);
+  user-select: text;
+  cursor: text;
+}
+
+.input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--ink-tertiary);
+}
+
+/* ============================== 任务卡 ============================== */
+
+.card {
+  background: var(--surface-card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  transition: border-color var(--motion-enter) ease;
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+}
+
+.card[data-expanded="true"] {
+  border-color: var(--accent-line);
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-related);
+}
+
+.card-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title b {
+  display: block;
+  font-size: var(--type-heading);
+  font-weight: var(--weight-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-title small {
+  display: block;
+  font-size: var(--type-detail);
+  color: var(--ink-tertiary);
+  font-weight: var(--weight-regular);
+  margin-top: 1px;
+}
+
+/* 图标气泡：身份色唯一被允许出现的大面积 */
+.icon-bubble {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--id-custom);
+  background: color-mix(in srgb, var(--id-custom) 14%, #ffffff);
+}
+
+.icon-bubble svg {
+  width: 24px;
+  height: 24px;
+}
+
+[data-id-color="sit"] .icon-bubble {
+  color: var(--id-sit);
+  background: color-mix(in srgb, var(--id-sit) 14%, #ffffff);
+}
+
+[data-id-color="water"] .icon-bubble {
+  color: var(--id-water);
+  background: color-mix(in srgb, var(--id-water) 14%, #ffffff);
+}
+
+[data-id-color="eye"] .icon-bubble {
+  color: var(--id-eye);
+  background: color-mix(in srgb, var(--id-eye) 14%, #ffffff);
+}
+
+/* 状态小圆点：身份色的另一处（暂停时让位给中性灰） */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--id-sit);
+  flex: none;
+}
+
+[data-id-color="water"] .dot {
+  background: var(--id-water);
+}
+
+[data-id-color="eye"] .dot {
+  background: var(--id-eye);
+}
+
+[data-id-color="custom"] .dot {
+  background: var(--id-custom);
+}
+
+[data-enabled="false"] .dot {
+  background: var(--ink-tertiary);
+}
+
+/* 展开/收起的 chevron（旧版这里是个齿轮，语义错了） */
+.card-toggle {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink-tertiary);
+}
+
+.card-toggle:hover {
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+}
+
+.card-toggle svg {
+  width: 16px;
+  height: 16px;
+  transition: transform var(--motion-enter) var(--ease-enter);
+}
+
+.card[data-expanded="true"] .card-toggle svg {
+  transform: rotate(180deg);
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+  padding-top: var(--space-related);
+  border-top: 2px solid var(--surface-sunken);
+}
+
+/* ============================== 设置分组 ============================== */
+
+.group {
+  background: var(--surface-card);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-tight);
+  padding: 11px 14px;
+  background: var(--surface-sunken);
+  font-size: var(--type-detail);
+  font-weight: var(--weight-bold);
+  color: var(--ink-secondary);
+}
+
+.group-head svg {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-tertiary);
+}
+
+.group-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-related);
+  padding: 12px 14px;
+  min-height: 56px;
+}
+
+.row + .row {
+  border-top: 2px solid var(--surface-sunken);
+}
+
+.row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-text b {
+  display: block;
+  font-size: var(--type-body);
+  font-weight: var(--weight-medium);
+}
+
+.row-text small {
+  display: block;
+  font-size: var(--type-micro);
+  color: var(--ink-tertiary);
+  font-weight: var(--weight-regular);
+  margin-top: 1px;
+}
+
+.row-ctl {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-tight);
+}
+
+/* 一行里的一组小按钮（换一个 / 试听 / 清除） */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-tight);
+}
+
+/* 「关于」顶部那行：应用标记 + 名字。标记是**透明底的填充图形**，
+   所以这里给的是颜色不是背景 —— 加个色块就变成一个缩小的 app 图标了，很土。
+   做成 .row 是为了吃到 `.row + .row` 那条分隔线，不必再补一条。 */
+.row-brand {
+  min-height: 0;
+  padding: 15px 14px;
+}
+
+.row-brand .brand-mark {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+
+.row-brand .row-text b {
+  font-size: var(--type-heading);
+  font-weight: var(--weight-heavy);
+  letter-spacing: -0.01em;
+}
+
+/* 设了值之后行标题下面的那条路径：太长会撑爆行，截断 */
+.row-text small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* 竖向排布的设置行：控件占满整行宽度 */
+.row-block {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-related);
+}
+
+.row-block .row-text {
+  flex: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-tight);
+}
+
+.field-label {
+  font-size: var(--type-detail);
+  font-weight: var(--weight-bold);
+  color: var(--ink-secondary);
+}
+
+.field-hint {
+  font-size: var(--type-micro);
+  color: var(--ink-tertiary);
+}
+
+/* ============================== 顶部倒计时条 ============================== */
+
+.countdown-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-related);
+  padding: 12px 14px;
+  border-radius: var(--radius-panel);
+  background: var(--accent-soft);
+  border: 2px solid var(--accent-line);
+}
+
+.countdown-strip svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+  flex: none;
+}
+
+.countdown-strip .cs-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--type-body);
+  font-weight: var(--weight-medium);
+  color: var(--accent-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown-strip .cs-time {
+  font-size: var(--type-title);
+  font-weight: var(--weight-heavy);
+  color: var(--accent-ink);
+  letter-spacing: var(--tracking-display);
+  flex: none;
+}
+
+.countdown-strip[data-idle="true"] {
+  background: var(--surface-sunken);
+  border-color: var(--line);
+}
+
+.countdown-strip[data-idle="true"] svg,
+.countdown-strip[data-idle="true"] .cs-text,
+.countdown-strip[data-idle="true"] .cs-time {
+  color: var(--ink-tertiary);
+}
+
+/* ============================== 底部页签 ============================== */
+
+.tabs {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 10px;
+  background: var(--surface-card);
+  border-top: 2px solid var(--line);
+}
+
+.tabs button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 0;
+  border-radius: var(--radius-control);
+  font-size: var(--type-micro);
+  font-weight: var(--weight-bold);
+  color: var(--ink-tertiary);
+  transition: color var(--motion-press) ease, background-color var(--motion-press) ease;
+}
+
+.tabs button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.tabs button[aria-selected="true"] {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+/* ============================== 空状态 ============================== */
+
+.empty {
+  text-align: center;
+  padding: var(--space-emphasis) var(--space-group);
+  color: var(--ink-tertiary);
+  font-size: var(--type-detail);
+}
+
+/* ============================== 提示条 ============================== */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-tight);
+  padding: 10px 13px;
+  border-radius: var(--radius-control);
+  font-size: var(--type-detail);
+  font-weight: var(--weight-medium);
+  background: var(--surface-sunken);
+  color: var(--ink-secondary);
+}
+
+.banner[data-tone="accent"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.banner[data-tone="warning"] {
+  background: var(--warning-soft);
+  color: var(--warning-ink);
+}
+
+.banner[data-tone="danger"] {
+  background: var(--danger-soft);
+  color: var(--danger-ink);
+}
+
+/* ============================== Toast ============================== */
+
+.toasts {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 78px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-tight);
+  pointer-events: none;
+  z-index: 40;
+}
+
+.toast {
+  max-width: calc(100% - 40px);
+  padding: 10px 16px;
+  border-radius: var(--radius-chip);
+  background: var(--ink-primary);
+  color: var(--ink-inverse);
+  font-size: var(--type-detail);
+  font-weight: var(--weight-medium);
+  box-shadow: var(--shadow-overlay);
+  animation: toast-in var(--motion-enter) var(--ease-enter);
+}
+
+.toast[data-tone="success"] {
+  background: var(--success-press);
+}
+
+.toast[data-tone="warning"] {
+  background: var(--warning-press);
+}
+
+.toast[data-tone="error"] {
+  background: var(--danger-press);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================== 居中浮窗 ============================== */
+
+/* 窗口是透明的，这个 stage 就是那圈让圆角透出来的留白。
+   它必须是透明且不接收点击的，否则桌面点击会被这层吞掉。 */
+.reminder-stage {
+  height: 100%;
+  display: flex;
+  padding: 14px;
+}
+
+.reminder-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-related);
+  padding: 22px 22px 18px;
+  background: var(--surface-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-overlay);
+  cursor: grab;
+}
+
+.reminder-card:active {
+  cursor: grabbing;
+}
+
+.reminder-card .icon-bubble {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+}
+
+.reminder-card .icon-bubble svg {
+  width: 32px;
+  height: 32px;
+}
+
+.reminder-card h2 {
+  font-size: 21px;
+  font-weight: var(--weight-heavy);
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.reminder-card p {
+  font-size: var(--type-body);
+  color: var(--ink-secondary);
+  text-align: center;
+  max-width: 26em;
+}
+
+.reminder-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-tight);
+  width: 100%;
+  margin-top: var(--space-tight);
+}
+
+/* ============================== 锁屏 ============================== */
+
+.lock-screen {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 闸门展开后内容会超过一屏，所以居中要能在溢出时退化成顶对齐 */
+  justify-content: safe center;
+  gap: var(--space-emphasis);
+  padding: var(--space-emphasis);
+  position: relative;
+  background: var(--lock-bg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.lock-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+/* 同 .page：列布局的默认 flex-shrink 会把表盘压扁，而不是让内容滚动。
+   闸门展开后内容一定超过一屏，这里必须显式关掉收缩。 */
+.lock-screen > * {
+  position: relative;
+  flex: none;
+}
+
+.lock-kicker {
+  font-size: var(--type-detail);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.22em;
+  color: var(--lock-ink-dim);
+}
+
+.lock-dial {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  display: grid;
+  place-items: center;
+}
+
+.lock-dial svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.lock-dial .track {
+  fill: none;
+  stroke: var(--lock-line);
+  stroke-width: 14;
+}
+
+.lock-dial .value {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 14;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.9s linear;
+}
+
+.lock-dial .readout {
+  text-align: center;
+}
+
+.lock-dial .clock {
+  font-size: 62px;
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-display);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.lock-dial .unit {
+  font-size: var(--type-detail);
+  color: var(--lock-ink-dim);
+  font-weight: var(--weight-bold);
+  margin-top: 6px;
+}
+
+.lock-title {
+  font-size: var(--type-title);
+  font-weight: var(--weight-bold);
+  text-align: center;
+}
+
+.lock-desc {
+  font-size: var(--type-body);
+  color: var(--lock-ink-dim);
+  text-align: center;
+  max-width: 30em;
+  margin-top: -14px;
+}
+
+.lock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-tight);
+  width: 260px;
+}
+
+.lock-screen .btn-ghost {
+  background: var(--lock-card);
+  border-color: var(--lock-line);
+  color: var(--lock-ink-dim);
+  box-shadow: 0 3px 0 #0f1116;
+}
+
+/* ============================== 紧急解锁闸门 ============================== */
+
+/* 闸门默认是收起来的：它不该是"休息中"界面上的一个显眼按钮。
+   要先点「紧急情况」才展开 —— 这一步本身就是一层摩擦。 */
+.gate-wrap {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-related);
+}
+
+.gate-trigger {
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  color: var(--lock-ink-dim);
+  font-size: var(--type-detail);
+  font-weight: var(--weight-medium);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--lock-line);
+  cursor: pointer;
+}
+
+.gate-trigger:hover {
+  color: var(--lock-ink);
+  text-decoration-color: currentColor;
+}
+
+.gate {
+  width: 100%;
+  background: var(--lock-card);
+  border: 2px solid var(--lock-line);
+  border-radius: var(--radius-card);
+  padding: var(--space-group);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-related);
+}
+
+.gate-title {
+  font-size: var(--type-heading);
+  font-weight: var(--weight-bold);
+}
+
+.gate-hint {
+  font-size: var(--type-micro);
+  color: var(--lock-ink-dim);
+  margin-top: -6px;
+}
+
+/* 可读不可选。这是拦不掉脚本输入这条诚实边界内，唯一还值得做的一件事。 */
+.gate .passage {
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: var(--lock-sunken);
+  border: 2px solid var(--lock-line);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--type-detail);
+  line-height: 1.9;
+  letter-spacing: 0.06em;
+  word-break: break-all;
+  user-select: none;
+  color: var(--lock-ink-dim);
+  max-height: 148px;
+  overflow-y: auto;
+}
+
+.gate .passage .ok {
+  color: var(--lock-ink);
+}
+
+/* 光标所在的那一个：256 个字母里，眼睛需要知道"打到哪了" */
+.gate .passage .here {
+  color: var(--accent);
+  background: rgba(28, 176, 246, 0.18);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.gate .passage .gap {
+  opacity: 0.5;
+}
+
+.gate textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--lock-sunken);
+  border: 2px solid var(--lock-line);
+  color: var(--lock-ink);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--type-detail);
+  line-height: 1.7;
+  letter-spacing: 0.06em;
+  resize: none;
+  user-select: text;
+  transition: border-color var(--motion-press) var(--ease-enter);
+}
+
+.gate textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.gate textarea.ok {
+  border-color: var(--success);
+}
+
+.gate textarea.bad {
+  border-color: var(--danger);
+}
+
+.gate-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-related);
+}
+
+.gate-track {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--radius-chip);
+  background: var(--lock-line);
+  overflow: hidden;
+}
+
+.gate-track i {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: var(--radius-chip);
+  background: var(--success);
+  transition: width var(--motion-press) linear;
+}
+
+.gate-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--type-detail);
+  font-weight: var(--weight-medium);
+  color: var(--lock-ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gate-status[data-state="ok"] {
+  color: var(--success);
+}
+
+.gate-status[data-state="bad"] {
+  color: var(--danger);
+}
+
+/* 大屏上把表盘放大：1280 宽以上 260px 的表盘显得很空 */
+@media (min-width: 1100px) {
+  .lock-dial {
+    width: 320px;
+    height: 320px;
+  }
+
+  .lock-dial .clock {
+    font-size: 78px;
+  }
+
+  .lock-actions {
+    width: 320px;
+  }
+}
+
+/* 推迟按钮下面那行小字：把"还能推迟几次"和"推迟多久"分开说。
+   合成一句会变成"推迟到 3 分钟后"，而 3 是次数 —— 那是旧界面的一处真错。 */
+.lock-snooze {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lock-snooze-left {
+  text-align: center;
+  font-size: var(--type-micro);
+  color: var(--lock-ink-dim);
+}

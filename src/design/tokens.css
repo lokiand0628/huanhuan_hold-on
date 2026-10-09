@@ -1,0 +1,134 @@
+/**
+ * 设计 Token · 浅色唯一主题
+ *
+ * 取自本地 `duolingo-design-reference`（品牌规范，非 UI token 表）：
+ * 色值一律用规范的动物名，方便回查 —— 括号里是规范里的名字。
+ *
+ * 规范给了三件明确的东西，本文件照做：
+ *   1. 完整调色板 + 语义分工：Macaw #1CB0F6 是"app 交互主色",
+ *      是按钮/链接/强调色的默认选择；Owl #58CC02 是品牌色，不是 UI 强调色。
+ *   2. 排版：Nunito 是规范钦定的 DIN Next Rounded 免费替代（已打进包）；
+ *      规范禁止 Feather Bold 全大写，字距 -20。
+ *   3. 形状与层次：唯一硬要求是"每个形状都必须有圆角"；阴影永远是胶囊形；
+ *      **永远不要用灰色做基色**，浅粉彩才是基色。
+ *
+ * 规范**没有**给的（不假装有，这些是本项目自己的语义层，规范 §4 明确允许
+ * "装饰色与状态色分开定义"由项目自己定）：圆角尺度、间距尺度、阴影数值、
+ * 动效时长、按钮尺寸。这些数值沿用本项目既有的一套，只修掉误用。
+ */
+
+/* ---- 拉丁与数字：Nunito 可变字体（200–1000 一个字重轴），随包分发 ---- */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: block;
+  src: url("./fonts/nunito-latin.woff2") format("woff2");
+}
+
+:root {
+  /* ---- 底面与容器 ---- */
+  --surface-base: #f7f7f7;   /* Polar */
+  --surface-card: #ffffff;
+  --surface-sunken: #f1f1f5;
+  --surface-hover: #eef7fe;
+
+  /* ---- 文字 ---- */
+  --ink-primary: #4b4b4b;    /* Eel */
+  --ink-secondary: #777777;  /* Wolf */
+  --ink-tertiary: #afafaf;   /* Hare */
+  --ink-inverse: #ffffff;
+
+  /* ---- 主强调：蓝。可操作、选中、主按钮一律用它 ---- */
+  --accent: #1cb0f6;         /* Macaw */
+  --accent-press: #1899d6;   /* Whale */
+  --accent-ink: #1453a3;     /* Narwhal */
+  --accent-soft: #ddf4ff;    /* Iguana */
+  --accent-line: #bbf2ff;    /* Beluga */
+
+  /* ---- 状态色：只表达"状态"，绝不当装饰，也绝不当主按钮底色 ----
+     绿只用于「完成 / 成功」，开关的"开"是蓝色，不是绿色。 */
+  --success: #58cc02;        /* Owl */
+  --success-press: #58a700;  /* Tree Frog */
+  --success-soft: #e4fbcf;   /* Sea Sponge 淡化 */
+  --success-line: #a5ed6e;   /* Turtle */
+  --success-ink: #3d8500;
+
+  --warning: #ff9600;        /* Fox */
+  --warning-press: #cd7900;  /* Guinea Pig */
+  --warning-soft: #fff1cf;   /* Canary 淡化 */
+  --warning-line: #ffce8e;   /* Cheetah */
+  --warning-ink: #a85e00;
+
+  --danger: #ff4b4b;         /* Cardinal */
+  --danger-press: #ea2b2b;   /* Fire Ant */
+  --danger-soft: #ffdfe0;    /* Walking Fish */
+  --danger-line: #ffb2b2;    /* Flamingo */
+  --danger-ink: #c02b2b;
+
+  /* ---- 身份色：只出现在图标气泡与状态小圆点上，绝不作为按钮或边框底色 ---- */
+  --id-sit: #1cb0f6;         /* Macaw */
+  --id-water: #58cc02;       /* Owl */
+  --id-eye: #ff9600;         /* Fox */
+  --id-custom: #9069cd;      /* Betta */
+
+  /* ---- 形状：按对象尺度选圆角，不做全胶囊 ---- */
+  --radius-card: 20px;
+  --radius-panel: 16px;
+  --radius-control: 12px;
+  --radius-chip: 999px;
+
+  /* ---- 边线 ---- */
+  --line: #e5e5e5;           /* Swan */
+  --line-strong: #d8d8d8;
+
+  /* ---- 层次：接触式厚度给可按压控件，弥散阴影给弹层 ---- */
+  --depth-rest: 0 3px 0 var(--line);
+  --depth-accent: 0 4px 0 var(--accent-press);
+  --depth-accent-press: 0 1px 0 var(--accent-press);
+  --depth-danger: 0 4px 0 var(--danger-press);
+  --depth-danger-press: 0 1px 0 var(--danger-press);
+  --depth-ghost: 0 3px 0 var(--line-strong);
+  --depth-ghost-press: 0 1px 0 var(--line-strong);
+  --shadow-overlay: 0 12px 32px rgba(75, 75, 75, 0.18);
+
+  /* ---- 排版 ---- */
+  --font-primary: "Nunito", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --type-display: 30px;
+  --type-title: 20px;
+  --type-heading: 15px;
+  --type-body: 13px;
+  --type-detail: 12px;
+  --type-micro: 11px;
+
+  --weight-regular: 600;
+  --weight-medium: 700;
+  --weight-bold: 800;
+  --weight-heavy: 900;
+
+  /* Feather Bold 的字距是 -20；Nunito 顶的是 DIN（tracking 0），
+     所以只有大号数字跟着收紧，正文保持 0。 */
+  --tracking-display: -0.02em;
+
+  /* ---- 间距：同组更密，分组更疏（规范只有这三个相对角色，无数值） ---- */
+  --space-tight: 6px;
+  --space-related: 10px;
+  --space-group: 16px;
+  --space-emphasis: 24px;
+  --space-page: 20px;
+
+  /* ---- 动效 ---- */
+  --motion-press: 0.06s;
+  --motion-enter: 0.18s;
+  --ease-enter: cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+/* 规范：尊重减少动效设置，不为动效增加操作等待 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-press: 0s;
+    --motion-enter: 0s;
+  }
+}
