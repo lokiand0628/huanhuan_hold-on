@@ -45,16 +45,6 @@
   box-shadow: var(--depth-accent-press);
 }
 
-.btn-danger {
-  background: var(--danger);
-  color: var(--ink-inverse);
-  box-shadow: var(--depth-danger);
-}
-
-.btn-danger:active:not(:disabled) {
-  box-shadow: var(--depth-danger-press);
-}
-
 /* 次级：白底 + 2px 描边 + 同样的厚度。Duolingo 的经典"第二按钮"。 */
 .btn-ghost {
   background: var(--surface-card);
@@ -89,7 +79,7 @@
 }
 
 .btn-sm {
-  min-height: 36px;
+  min-height: var(--control-h-sm);
   padding: 0 14px;
   font-size: var(--type-body);
 }
@@ -637,17 +627,6 @@
   max-width: 100%;
 }
 
-/* 竖向排布的设置行：控件占满整行宽度 */
-.row-block {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-related);
-}
-
-.row-block .row-text {
-  flex: none;
-}
-
 .field {
   display: flex;
   flex-direction: column;
@@ -756,35 +735,6 @@
   padding: var(--space-emphasis) var(--space-group);
   color: var(--ink-tertiary);
   font-size: var(--type-detail);
-}
-
-/* ============================== 提示条 ============================== */
-
-.banner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-tight);
-  padding: 10px 13px;
-  border-radius: var(--radius-control);
-  font-size: var(--type-detail);
-  font-weight: var(--weight-medium);
-  background: var(--surface-sunken);
-  color: var(--ink-secondary);
-}
-
-.banner[data-tone="accent"] {
-  background: var(--accent-soft);
-  color: var(--accent-ink);
-}
-
-.banner[data-tone="warning"] {
-  background: var(--warning-soft);
-  color: var(--warning-ink);
-}
-
-.banner[data-tone="danger"] {
-  background: var(--danger-soft);
-  color: var(--danger-ink);
 }
 
 /* ============================== Toast ============================== */

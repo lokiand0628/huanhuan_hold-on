@@ -97,10 +97,16 @@ select {
   flex: none;
 }
 
+/* 行高钉死在小号控件的高度上。
+   页头是 `align-items: center` 的 flex 行：提醒页那行里有两个 `.btn-sm`(36px)，
+   而 `h1` 只有 29px，于是标题被下移 (36-29)/2 = 3.5px；设置页那行只有标题，
+   行高就是 29px，标题贴着顶。**切页签时标题会上下跳 3.5px。**
+   给行一个下限，标题的落点就与"这页有没有按钮"无关了。 */
 .page-head {
   display: flex;
   align-items: center;
   gap: var(--space-related);
+  min-height: var(--control-h-sm);
 }
 
 .page-head h1 {
@@ -108,12 +114,6 @@ select {
   font-weight: var(--weight-bold);
   letter-spacing: -0.01em;
   flex: 1;
-}
-
-.page-head .page-sub {
-  font-size: var(--type-detail);
-  color: var(--ink-tertiary);
-  font-weight: var(--weight-regular);
 }
 
 /* ---------- 沉浸式标题栏 ---------- */

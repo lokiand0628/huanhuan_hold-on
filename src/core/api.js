@@ -9,7 +9,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen as tauriListen } from '@tauri-apps/api/event';
 import { getVersion } from '@tauri-apps/api/app';
-import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { open as openDialog, ask } from '@tauri-apps/plugin-dialog';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
@@ -17,7 +16,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { createMock } from './mock.js';
 
 const params = new URLSearchParams(location.search);
-export const IS_MOCK = params.get('mock') === '1';
+const IS_MOCK = params.get('mock') === '1';
 
 /**
  * 「检查更新」只问这一个仓库，而且**只问、不装**。
@@ -27,7 +26,7 @@ export const IS_MOCK = params.get('mock') === '1';
  * 现在改成查 GitHub 的 latest release，有新版就把人送到仓库页面自己下。
  * 代价是没有静默升级；换来的是不用保管私钥，也不会装错东西。
  */
-export const REPO = 'lokiand0628/huanhuan_hold-on';
+const REPO = 'lokiand0628/huanhuan_hold-on';
 
 const safe = (fn, fallback = null) =>
   fn().catch(err => {
@@ -85,9 +84,6 @@ const real = {
   autostartEnabled: () => isEnabled(),
   autostartEnable: () => enable(),
   autostartDisable: () => disable(),
-
-  permissionGranted: () => isPermissionGranted(),
-  requestPermission: () => requestPermission(),
 
   pickFile: (filters, multiple = false) => openDialog({ multiple, filters }),
   // 用插件而不是 window.confirm：WKWebView 下的原生 confirm 行为不一致

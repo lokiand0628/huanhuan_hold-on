@@ -52,7 +52,7 @@ function renderTabs() {
  * 提示条。只在这里重建 —— 它不在任何输入控件的祖先链上，
  * 所以重建它不会打断正在打字的人。
  */
-function renderToasts() {
+export function renderToasts() {
   if (!state.toasts.length) return h('div', { class: 'toasts' });
   return h(
     'div',

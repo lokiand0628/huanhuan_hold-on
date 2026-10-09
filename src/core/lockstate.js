@@ -14,7 +14,7 @@
  */
 import { api } from './api.js';
 import { state } from './store.js';
-import { taskTitle, taskDesc, S } from './strings.js';
+import { taskTitle, taskDesc } from './strings.js';
 import {
   makeLockRecord,
   saveLock,
@@ -291,10 +291,6 @@ export function gateMatched(input) {
   return i;
 }
 
-export function gateComplete(input) {
-  return gateMatched(input) >= (record?.gate_text?.length || GATE_LENGTH);
-}
-
 export function gateTotal() {
   return record?.gate_text?.length || GATE_LENGTH;
 }
@@ -333,5 +329,3 @@ export async function persistBeforeExit() {
   advanceCheckpoint(record);
   await saveLock(record);
 }
-
-export { S };

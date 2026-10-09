@@ -456,6 +456,7 @@ export function createActions(ctx) {
       }
       onGateInput(value);
       syncGate(el.closest('.gate'), value, matched);
+      scheduleGateCommit(matched);
     },
 
     async 'gate-submit'() {
@@ -476,6 +477,22 @@ let commitTimer = null;
 function scheduleCommit(commit) {
   clearTimeout(commitTimer);
   commitTimer = setTimeout(() => commit({ resync: false }), 250);
+}
+
+/**
+ * 闸门进度的落盘节流。
+ *
+ * `lock.json` 里一直有个 `gate_matched` 字段，锁屏上那句"重启后不用重打"
+ * 也一直这么写着 —— 但在此之前**没有任何地方更新它**，它停在锁开始时的 0，
+ * 重启就得从头敲 256 个字符。每敲一个字符写一次盘又太狠，所以和打字共用
+ * 同一套节流思路，只是间隔更稀：闸门进度丢几百毫秒无关紧要。
+ */
+let gateCommitTimer = null;
+function scheduleGateCommit(matched) {
+  clearTimeout(gateCommitTimer);
+  gateCommitTimer = setTimeout(() => {
+    lock.rememberGate(matched).catch(err => console.error('[gate] 进度落盘失败', err));
+  }, 400);
 }
 
 /**

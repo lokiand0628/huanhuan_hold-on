@@ -225,12 +225,6 @@ export function createMock(params) {
     async autostartDisable() {
       localStorage.setItem('mock.autostart', '0');
     },
-    async permissionGranted() {
-      return true;
-    },
-    async requestPermission() {
-      return 'granted';
-    },
     async pickFile() {
       // 浏览器里没法开原生文件框，给一个假的路径让流程能走完
       return '/tmp/mock-sound.mp3';

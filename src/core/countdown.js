@@ -34,7 +34,7 @@ function apply(info) {
 }
 
 /** 托盘 tooltip 那份倒计时（主窗口之外唯一还显示剩余时间的地方） */
-export function trayTip() {
+function trayTip() {
   const best = bestRemaining();
   if (!best) return '健康提醒';
   return `${taskTitle(best.task)} ${fmt(best.left)}`;

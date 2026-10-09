@@ -47,7 +47,13 @@
   --accent-line: #bbf2ff;    /* Beluga */
 
   /* ---- 状态色：只表达"状态"，绝不当装饰，也绝不当主按钮底色 ----
-     绿只用于「完成 / 成功」，开关的"开"是蓝色，不是绿色。 */
+     绿只用于「完成 / 成功」，开关的"开"是蓝色，不是绿色。
+
+     注意：下面每个状态色都配了 press / soft / line / ink 四个变体，这是规范
+     要求的完整语义色板。**但其中一部分目前是零引用的**（soft / line 系
+     基本没人用；`--surface-hover` `--type-display` `--depth-rest` 也是）。
+     之所以留着而不是删掉，是因为"色板求全"是设计规范本身的要求，删掉这些
+     反而会让后面的人重新硬编码色值。用到的以 `var()` 引用为准。 */
   --success: #58cc02;        /* Owl */
   --success-press: #58a700;  /* Tree Frog */
   --success-soft: #e4fbcf;   /* Sea Sponge 淡化 */
@@ -86,8 +92,6 @@
   --depth-rest: 0 3px 0 var(--line);
   --depth-accent: 0 4px 0 var(--accent-press);
   --depth-accent-press: 0 1px 0 var(--accent-press);
-  --depth-danger: 0 4px 0 var(--danger-press);
-  --depth-danger-press: 0 1px 0 var(--danger-press);
   --depth-ghost: 0 3px 0 var(--line-strong);
   --depth-ghost-press: 0 1px 0 var(--line-strong);
   --shadow-overlay: 0 12px 32px rgba(75, 75, 75, 0.18);
@@ -111,6 +115,12 @@
   /* Feather Bold 的字距是 -20；Nunito 顶的是 DIN（tracking 0），
      所以只有大号数字跟着收紧，正文保持 0。 */
   --tracking-display: -0.02em;
+
+  /* ---- 控件高度 ----
+     小号控件的固定高度。`.page-head` 也要用它当行高下限：页头是 flex 行，
+     里面有没有 `.btn-sm` 会把行撑到不同高度，标题跟着上下浮动几个像素 ——
+     提醒页有按钮、设置页没有，切页签时标题就会跳。 */
+  --control-h-sm: 36px;
 
   /* ---- 间距：同组更密，分组更疏（规范只有这三个相对角色，无数值） ---- */
   --space-tight: 6px;

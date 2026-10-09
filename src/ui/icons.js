@@ -111,8 +111,6 @@ export const TASK_ICON_GROUPS = [
   { color: 'custom', icons: ['hand', 'heart-pulse', 'smile', 'sparkles'] },
 ];
 
-export const TASK_ICONS = TASK_ICON_GROUPS.flatMap(group => group.icons);
-
 /** 中文名。只当 aria-label 用，界面上不显示 —— 图标本身就该自解释。 */
 export const TASK_ICON_LABELS = {
   sunrise: '早起',
@@ -158,9 +156,6 @@ const LEGACY_TASK_ICONS = {
   eye: 'eye',
   custom: 'sparkles',
 };
-
-/** 老名字清单。store.js 迁移配置时要用它判断"这个值是不是历史遗留"。 */
-export const LEGACY_ICON_NAMES = Object.keys(LEGACY_TASK_ICONS);
 
 /** 任意写法（新名 / 老名）→ 当前集合里的名字；不认识就返回 null，交给调用方兜底 */
 export function normalizeIconName(name) {

@@ -24,8 +24,6 @@ export const S = {
   notScheduled: '未安排',
   addTask: '添加提醒',
   done: '已完成',
-  everyNMinutes: n => `每 ${n} 分钟`,
-  dailyAt: times => `每天 ${times.join('、')}`,
   modeFocus: '居中浮窗',
   modeLock: '锁屏强制',
   pauseAll: '全部暂停',
@@ -51,8 +49,6 @@ export const S = {
   deleteTask: '删除这个提醒',
   deleteTaskConfirm: title => `删除「${title}」？这个操作撤不回来。`,
   newTaskTitle: '新提醒',
-  newTaskDesc: '点这里改名字',
-  never: '不推迟',
   minutes: '分钟',
   seconds: '秒',
   hours: '小时',
@@ -98,8 +94,6 @@ export const S = {
   /* ---- 居中浮窗 ---- */
   reminderConfirm: '知道了',
   reminderSnooze: n => `稍后再说 (${n})`,
-  reminderNoSnooze: '稍后再说',
-  reminderSnoozeDone: '今天先不催了',
 
   /* ---- 锁屏 ---- */
   lockKicker: '该休息了',
@@ -117,35 +111,22 @@ export const S = {
   gatePass: '对上了，可以解除',
   gateDone: '解除休息',
   gateWaiting: '还没输完',
-  gateNew: '换一段',
 
   /* ---- 更新 ---- */
   // 本版**不做**自动下载安装：只问一句 GitHub 上有没有更新的 tag，
   // 有就把人引到仓库的 release 页。用户已明确要这个形态。
   updateLatest: '已经是最新版',
   updateAvailable: v => `有新版本 ${v}，去仓库看看`,
-  updateOpenFail: '打不开浏览器，地址是',
   updateFail: '查不了更新，检查一下网络',
-  updateCopyHint: '地址已复制到剪贴板',
 
   /* ---- 指纹 / 密码 ---- */
   authReason: '改休息时长',
   authFail: '没验证过，时长没改',
-  authUnavailable: '这台机器验不了指纹，时长没改',
 
   /* ---- 提示 ---- */
-  toastSaved: '已保存',
   toastDeleted: '已删除',
-  toastBadImage: '这个文件读不了，换张图试试',
   toastBadTime: '时间格式不对，像 22:00 这样写',
   toastDupeTime: '这个时间已经加过了',
-  toastBadSound: '这个音频读不了，换一个试试',
-  toastExitBlocked: '休息还没结束，先完成它',
-  toastSoundNotFound: '找不到这个文件了',
-
-  /* ---- 通知（提前预告用） ---- */
-  preNotifyTitle: title => `${title} 快到了`,
-  preNotifyBody: secs => `${secs} 秒后开始`,
 };
 
 /** 内置任务的标题与说明。用户改过之后就用用户自己的。 */

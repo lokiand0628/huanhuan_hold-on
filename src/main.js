@@ -26,7 +26,7 @@ import { saveSettings } from './core/persist.js';
 import * as lock from './core/lockstate.js';
 import { createActions } from './core/actions.js';
 import { initCountdowns, subscribeCountdowns, fmt, bestRemaining } from './core/countdown.js';
-import { renderApp } from './views/App.js';
+import { renderApp, renderToasts } from './views/App.js';
 import { renderReminder } from './views/Reminder.js';
 import { renderLock, tickLock } from './views/Lock.js';
 import { mount, delegate, assertHandlers } from './ui/dom.js';
@@ -37,6 +37,16 @@ const MODE = params.get('mode') || 'main';
 const IS_SLAVE = MODE === 'lock_slave' || MODE === 'lock';
 const root = document.getElementById('app');
 
+// 路由属性要在**任何 await 之前**就落上：它决定 body 是浅色、暗色还是透明，
+// 晚一步就会先闪一下错的底色。
+//
+// 居中浮窗那条路尤其不能省。它的 boot 第一句就是 await，而且它根本不走
+// `render()`（render 对 reminder 提前 return），`applyRoute()` 又只在 render 里调 ——
+// 所以除这一行之外，没有任何地方会给它设上 `data-route="reminder"`。
+// 漏掉的表现是：无边框透明窗口里糊着一整块不透明的浅灰方角（body 的默认底），
+// 圆角卡片的阴影和四周留白全没了。
+document.body.dataset.route = MODE === 'reminder' ? 'reminder' : 'main';
+
 /* ============================== 提示条 ============================== */
 
 let toastSeq = 0;
@@ -44,11 +54,25 @@ function toast(text, tone = 'neutral') {
   if (MODE !== 'main') return;
   const id = ++toastSeq;
   state.toasts = [...state.toasts, { id, text, tone }];
-  render();
+  renderToastsInto();
   setTimeout(() => {
     state.toasts = state.toasts.filter(t => t.id !== id);
-    render();
+    renderToastsInto();
   }, 2600);
+}
+
+/**
+ * 只重画提示条那一块，**不调 `render()`**。
+ *
+ * `render()` 是整棵重绘，会把页面上所有输入框换掉。而 toast 偏偏是被
+ * 「删除任务 / 全部重置 / 检查更新」这类动作触发的 —— 用户完全可能紧接着
+ * 就开始打字，于是 2.6 秒后那次整棵重绘会连焦点带没提交的草稿一起吞掉
+ * （锁定时长那个输入框的数字只存在 DOM 里，见 actions.js 的 `applyDuration`）。
+ * 提示条不在任何输入控件的祖先链上，所以单独重建它是安全的。
+ */
+function renderToastsInto() {
+  const box = root.querySelector('.toasts');
+  if (box) mount(box, renderToasts());
 }
 
 /* ============================== 渲染 ============================== */
@@ -93,9 +117,10 @@ function render() {
   assertHandlers(root, actions);
 }
 
-/** 锁屏要暗色全屏，主界面要浅色 —— 两者在同一个窗口里靠这个属性切换 */
+/** 锁屏要暗色全屏，主界面要浅色，居中浮窗要透明 —— 靠这个属性切换 */
 function applyRoute() {
-  document.body.dataset.route = state.lock ? 'lock' : IS_SLAVE ? 'lock' : 'main';
+  document.body.dataset.route =
+    MODE === 'reminder' ? 'reminder' : state.lock || IS_SLAVE ? 'lock' : 'main';
 }
 
 const actions = createActions({
@@ -112,6 +137,8 @@ const actions = createActions({
   },
   lock: {
     isLocked: () => lock.isLocked(),
+    // 闸门进度落盘（重启后不用重打）。调用点做了节流，见 actions.js。
+    rememberGate: matched => lock.rememberGate(matched),
     finish: async () => {
       const record = state.lock;
       await lock.finishLock();
@@ -233,6 +260,29 @@ async function boot() {
     if (!state.lock) updateStrip();
   });
 
+  // 空闲状态：后端在 `is_idle` 翻转时推一次（低 5 秒、状态变了才推），
+  // 前端此前**从来没订阅过**这个事件 —— 于是 `state.isIdle` 永远是 false，
+  // 「你离开了，计时先停着」那句话永远不会出现。这里接上。
+  //
+  // 收到后只动顶部那一条：它既要换文案（`updateStrip`）也要换 `data-idle`
+  // 的样式，但空闲翻转是低频事件，且整棵重绘会吃掉正在输入的内容，不值得。
+  api.listen('idle-status-changed', event => {
+    const idle = !!event?.payload?.is_idle;
+    if (state.isIdle === idle) return;
+    state.isIdle = idle;
+    if (state.lock) return; // 锁屏时顶部那一条根本不在
+    const strip = root.querySelector('.countdown-strip');
+    if (strip) strip.dataset.idle = String(idle || state.isPaused);
+    updateStrip();
+  });
+
+  // 退出前再落一次盘（检查点 + 闸门进度）。心跳约每秒一次、检查点约每 10 秒
+  // 一次，所以正常关窗最多丢 10 秒的检查点。`pagehide` 里发 IPC 是**尽力而为**，
+  // 不保证送达 —— 送了总比不送强，而且这条路平时没人依赖。
+  window.addEventListener('pagehide', () => {
+    lock.persistBeforeExit().catch(err => console.error('[lock] 退出前落盘失败', err));
+  });
+
   wireTriggerDelivery();
   render();
 
@@ -266,7 +316,10 @@ async function boot() {
  * 于是正在打字的人会被下面这一秒的重绘打断。
  */
 function updateStrip() {
-  const best = bestRemaining();
+  // 空闲时显示的是「计时停着」，不是剩余时间 —— 必须和 renderCountdown 的
+  // 判断一致。少了 `state.isIdle` 这一项，首帧画的是 `--:--`，一秒后就被
+  // 这里覆盖成一个真实数字（后端把计时冻结了，`bestRemaining` 照样有值）。
+  const best = state.isPaused || state.isIdle ? null : bestRemaining();
   const time = root.querySelector('[data-role="strip-time"]');
   if (time) {
     const next = state.isPaused ? '--:--' : best ? fmt(best.left) : '--:--';

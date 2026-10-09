@@ -26,7 +26,6 @@ export function h(tag, props = null, ...children) {
       else if (key === 'dataset') Object.assign(el.dataset, value);
       else if (key === 'style' && typeof value === 'object') Object.assign(el.style, value);
       else if (key === 'value') el.value = value;
-      else if (key === 'html') el.innerHTML = value; // 仅限内置的可信 SVG 片段
       else if (key.startsWith('on')) el.addEventListener(key.slice(2).toLowerCase(), value);
       else if (value === true) el.setAttribute(key, '');
       else el.setAttribute(key, String(value));
@@ -97,18 +96,14 @@ export function delegate(root, handlers) {
   root.addEventListener('input', dispatch(':input'));
   root.addEventListener('change', dispatch(':change'));
 
-  // 键盘：role="switch" 的分段/开关要能用空格和回车操作。
-  // 旧版的 .switch 是个 div，键盘完全够不着。
-  root.addEventListener('keydown', event => {
-    if (event.key !== ' ' && event.key !== 'Enter') return;
-    const el = event.target;
-    if (!(el instanceof HTMLElement) || !el.dataset.act) return;
-    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
-    const handler = handlers[el.dataset.act];
-    if (!handler) return;
-    event.preventDefault();
-    handler(el, event);
-  });
+  // 键盘可达性靠原生控件：带 `data-act` 的元素**全部**是 `<button>` 或 `<input>`，
+  // 前者本来就响应空格与回车，并派发一个真正的 click —— 走上面那条委托，不必另接。
+  //
+  // 这里原先有个 keydown 监听，是为旧版那个 `<div class="switch">` 补键盘用的。
+  // 开关早就换成 `<button role="switch">` 了，于是监听里每条分支都只会 return，
+  // 等于一个空监听（连它自己的注释都在说过时的话）。已删。
+  //
+  // 给后来的人：**别把带 `data-act` 的元素写成 div** —— 那样会真的丢掉键盘操作。
 }
 
 /**
@@ -130,14 +125,4 @@ export function assertHandlers(root, handlers) {
   if (missing.size) {
     console.warn('[dom] 这些 data-act 没有任何处理器，点了不会有反应：', [...missing]);
   }
-}
-
-/** 按 data-role 取节点，只用来做"不重绘的局部更新" */
-export function live(root, role) {
-  return root.querySelector(`[data-role="${role}"]`);
-}
-
-export function setText(root, role, value) {
-  const el = live(root, role);
-  if (el && el.textContent !== value) el.textContent = value;
 }

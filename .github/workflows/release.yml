@@ -84,19 +84,35 @@ jobs:
       # GitHub 上传资产时会把非 ASCII 的前缀整段抹掉，最后挂上去的只剩
       # `_0.0.1_aarch64.dmg` —— 下载下来像个坏文件。这里把**资产名**改成 ASCII 的，
       # release 标题里的「缓缓」不受影响。
+      #
+      # 取 id 有个坑：**不能**用 `--json assets` 里的 `.id` —— 那是 node_id
+      # （`RA_kwDO…`），而 `/releases/assets/<id>` 要的是 URL 末段的数字 id。
+      # 拿 node_id 去问，GitHub 回 404 而不是 400（这个坑让 v0.0.1 那次发布红过），
+      # 所以数字 id 只从 apiUrl 里取，并且加一道"必须是纯数字"的校验。
       - name: Give the dmg an ASCII filename
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           tag="${{ github.ref_name }}"
+          ascii="Huanhuan_${tag#v}_aarch64.dmg"
+
           gh release view "$tag" --repo "${{ github.repository }}" \
               --json assets \
-              --jq '.assets[] | select(.name | endswith(".dmg")) | "\(.id) \(.name)"' |
+              --jq '.assets[]
+                    | select(.name | endswith(".dmg"))
+                    | "\(.apiUrl | split("/") | last) \(.name)"' |
           while read -r id name; do
             if [ "${name#Huanhuan_}" != "$name" ]; then
-              continue
+              continue          # 已经是 ASCII 名字 → 重跑幂等
             fi
+            case "$id" in
+              '' | *[!0-9]*)
+                echo "::error::资产 id 不是纯数字（取到的是 node_id？）：$id"
+                exit 1
+                ;;
+            esac
             gh api -X PATCH \
               "repos/${{ github.repository }}/releases/assets/$id" \
-              -f "name=Huanhuan_${tag#v}_aarch64.dmg" >/dev/null
+              -f "name=$ascii" >/dev/null
+            echo "renamed: $name -> $ascii"
           done

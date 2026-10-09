@@ -6,14 +6,12 @@
  * 硬约束（旧版栽过的地方）：**UI 状态也要进 store**。旧版"哪张卡展开着"
  * 只存在 DOM 的 data-open 上，于是任何一个动作触发重绘，展开的卡片就塌掉。
  */
-import { S, BUILTIN, BUILTIN_IDS, taskTitle as titleOf } from './strings.js';
+import { BUILTIN, BUILTIN_IDS, taskTitle as titleOf } from './strings.js';
 import { normalizeIconName } from '../ui/icons.js';
-
-export { BUILTIN_IDS };
 
 // icon 显式写出来，不再靠"id 恰好等于图标名"这个巧合 —— 内置任务的 id 是
 // sit/water/eye，而图标名已经换成 person-standing/glass-water/eye，两者不再重合。
-export const DEFAULT_TASKS = [
+const DEFAULT_TASKS = [
   { id: 'sit', icon: 'person-standing', interval: 45, snoozeMinutes: 5 },
   { id: 'water', icon: 'glass-water', interval: 60, snoozeMinutes: 5 },
   { id: 'eye', icon: 'eye', interval: 20, snoozeMinutes: 2 },
@@ -33,7 +31,7 @@ export const DURATION_UNITS = { sec: 1, min: 60, hour: 3600 };
  * 一个秒数"最自然"的单位：能整除掉的最大单位。
  * 90 秒 → 秒（60 除得尽但 90/60 不是整数，所以仍用秒），120 → 分钟，7200 → 小时。
  */
-export function bestUnit(seconds) {
+function bestUnit(seconds) {
   if (seconds % DURATION_UNITS.hour === 0 && seconds >= DURATION_UNITS.hour) return 'hour';
   if (seconds % DURATION_UNITS.min === 0 && seconds >= DURATION_UNITS.min) return 'min';
   return 'sec';
@@ -94,23 +92,7 @@ export function isDaily(task) {
   );
 }
 
-/** 下一个会触发的提醒；被单任务暂停的排除 */
-export function nextTask() {
-  let best = null;
-  let bestLeft = Infinity;
-  for (const task of state.settings.tasks) {
-    if (!task.enabled || state.pausedTasks[task.id]) continue;
-    const left = state.countdowns[task.id];
-    if (left === undefined) continue;
-    if (left < bestLeft) {
-      bestLeft = left;
-      best = task;
-    }
-  }
-  return best ? { task: best, left: bestLeft } : null;
-}
-
-export function nextCustomId() {
+function nextCustomId() {
   return `task_${Date.now().toString(36)}`;
 }
 
@@ -271,5 +253,3 @@ export function toBackendTasks() {
     daily_times: task.dailyTimes,
   }));
 }
-
-export { S };
