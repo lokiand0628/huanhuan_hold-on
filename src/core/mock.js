@@ -11,6 +11,35 @@
 const LS_SETTINGS = 'mock.settings';
 const LS_LOCK = 'mock.lock';
 const LS_REMINDER = 'mock.reminder';
+const LS_OPS = 'mock.ops';
+
+/**
+ * 跨窗口的操作转交。
+ *
+ * 计时器只活在**主窗口**那一份 mock 实例里（`syncTasks` 是在那儿调的）。
+ * 居中浮窗是另一个窗口，它那份实例的 `timers` 是空的 —— 于是在小窗里点
+ * 「知道了」或「稍后再说」，直接改本地 timers 等于什么都没发生，弹窗关了
+ * 但任务不会被重置也不会被推迟。真后端里这些都是全局的 Tauri 命令，不存在
+ * 这个问题；mock 得用 localStorage 把自己补成"全局的"。
+ *
+ * 只有还没 `syncTasks` 过的实例（也就是小窗）才会转交；主窗口自己直接执行。
+ */
+function relay(op, args) {
+  const list = JSON.parse(localStorage.getItem(LS_OPS) || '[]');
+  list.push({ op, args });
+  localStorage.setItem(LS_OPS, JSON.stringify(list));
+}
+
+function drainOps() {
+  const raw = localStorage.getItem(LS_OPS);
+  if (!raw) return [];
+  localStorage.removeItem(LS_OPS);
+  try {
+    return JSON.parse(raw) || [];
+  } catch {
+    return [];
+  }
+}
 
 export function createMock(params) {
   const FAST = params.get('fast') === '1';
@@ -21,6 +50,8 @@ export function createMock(params) {
   const pending = [];
   let globalPaused = false;
   let popup = null;
+  /** 这个实例有没有接手过计时器。没有 = 它是小窗那份，写操作要转交出去。 */
+  let hasSynced = false;
 
   function emitLocal(event, payload) {
     const set = listeners.get(event);
@@ -40,10 +71,56 @@ export function createMock(params) {
       remaining: Math.max(0, Math.round(t.remaining)),
       enabled: t.enabled,
       task_paused: t.paused,
+      snoozed: t.snoozed,
     }));
   }
 
+  /* ---- 真正的执行体。api 上的那几个命令要么直接调它，要么转交给主窗口 ---- */
+
+  function doResetTask(id) {
+    const t = timers.get(id);
+    if (t) {
+      t.remaining = t.interval;
+      t.snoozed = false;
+    }
+    emitLocal('countdown-update', snapshotCountdowns());
+  }
+
+  function doResetAll() {
+    for (const t of timers.values()) {
+      t.remaining = t.interval;
+      t.snoozed = false;
+    }
+    emitLocal('countdown-update', snapshotCountdowns());
+  }
+
+  function doSnoozeTask(id, minutes) {
+    const t = timers.get(id);
+    if (t) {
+      t.remaining = minutes * 60;
+      t.snoozed = true;
+    }
+    emitLocal('countdown-update', snapshotCountdowns());
+  }
+
+  function doAckTriggered(id) {
+    const i = pending.findIndex(p => p.id === id);
+    if (i >= 0) pending.splice(i, 1);
+  }
+
+  function applyOp(op, args) {
+    if (op === 'resetTask') doResetTask(args[0]);
+    else if (op === 'resetAll') doResetAll();
+    else if (op === 'snoozeTask') doSnoozeTask(args[0], args[1]);
+    else if (op === 'ackTriggered') doAckTriggered(args[0]);
+  }
+
   setInterval(() => {
+    // 先领走别的窗口转交过来的操作（小窗里的「知道了」「稍后再说」）。
+    // 必须放在下面那个 `timers.size === 0` 的提前返回**之前** ——
+    // 主窗口在没有任务时也会 early return。
+    for (const { op, args } of drainOps()) applyOp(op, args);
+
     if (timers.size === 0) return;
     let dirty = false;
 
@@ -53,7 +130,10 @@ export function createMock(params) {
       t.remaining = Math.max(0, t.remaining - SPEED);
       dirty = true;
       if (t.remaining === 0) {
-        const payload = { id, title: t.title, desc: t.desc, icon: t.icon };
+        // `from_snooze` 要跟真后端一样带上（见 lib.rs 的 TaskTriggeredPayload）：
+        // 浮窗靠它兑现"软提醒只推迟一次"。清标志要放在发出去之前。
+        const payload = { id, title: t.title, desc: t.desc, icon: t.icon, from_snooze: t.snoozed };
+        t.snoozed = false;
         pending.push(payload);
         emitLocal('task-triggered', payload);
       }
@@ -73,6 +153,9 @@ export function createMock(params) {
 
     /* ---- 计时 ---- */
     async syncTasks(tasks) {
+      // 从这一刻起，这个实例就是"拥有计时器的那一份"。主窗口 boot 时必调，
+      // 小窗（bootReminder）永远不调 —— 这就是两者唯一的区别。
+      hasSynced = true;
       const seen = new Set();
       for (const task of tasks || []) {
         seen.add(task.id);
@@ -84,6 +167,7 @@ export function createMock(params) {
             interval: total,
             enabled: task.enabled !== false,
             paused: false,
+            snoozed: false,
             title: task.title,
             desc: task.desc,
             icon: task.icon,
@@ -121,18 +205,16 @@ export function createMock(params) {
       if (t) t.paused = false;
     },
     async resetTask(id) {
-      const t = timers.get(id);
-      if (t) t.remaining = t.interval;
-      emitLocal('countdown-update', snapshotCountdowns());
+      if (!hasSynced) return relay('resetTask', [id]);
+      doResetTask(id);
     },
     async resetAll() {
-      for (const t of timers.values()) t.remaining = t.interval;
-      emitLocal('countdown-update', snapshotCountdowns());
+      if (!hasSynced) return relay('resetAll', []);
+      doResetAll();
     },
     async snoozeTask(id, minutes) {
-      const t = timers.get(id);
-      if (t) t.remaining = minutes * 60;
-      emitLocal('countdown-update', snapshotCountdowns());
+      if (!hasSynced) return relay('snoozeTask', [id, minutes]);
+      doSnoozeTask(id, minutes);
     },
     async countdowns() {
       return snapshotCountdowns();
@@ -141,8 +223,8 @@ export function createMock(params) {
       return pending.slice();
     },
     async ackTriggered(id) {
-      const i = pending.findIndex(p => p.id === id);
-      if (i >= 0) pending.splice(i, 1);
+      if (!hasSynced) return relay('ackTriggered', [id]);
+      doAckTriggered(id);
     },
     async setLockScreenActive() {},
     async lockHeartbeat() {},
@@ -201,7 +283,7 @@ export function createMock(params) {
 
     /* ---- 系统 ---- */
     async version() {
-      return '0.0.1 (mock)';
+      return '0.0.2 (mock)';
     },
     async playSound() {
       console.log('[mock] 播放提示音');

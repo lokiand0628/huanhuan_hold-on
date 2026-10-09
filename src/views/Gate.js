@@ -29,7 +29,7 @@ export function renderGate(input) {
     { class: 'gate', dataset: { role: 'gate' } },
     h('div', { class: 'gate-title' }, S.lockGateTitle),
     h('div', { class: 'gate-hint' }, S.gateHint),
-    h('div', { class: 'passage', dataset: { role: 'gate-passage' } }, format(target, matched, input.length)),
+    h('div', { class: 'passage', dataset: { role: 'gate-passage' } }, format(target, matched)),
 
     h(
       'textarea',
@@ -91,10 +91,13 @@ export function renderGate(input) {
  * 每 4 个字母一空格、每 32 个换行 —— 256 个连着的字母是没法逐字符比对的，
  * 分组之后眼睛能落在组上，错一个字符立刻看得出来。
  */
-function format(target, matched, typedLength) {
+function format(target, matched, wrong = false) {
   const nodes = [];
   for (let i = 0; i < target.length; i += 1) {
-    const cls = i < matched ? 'ok' : i === matched && typedLength >= matched ? 'here' : '';
+    let cls = i < matched ? 'ok' : i === matched ? 'here' : '';
+    // 刚敲错的那一下：把光标位置那个字符由蓝转红。
+    // 比另起一行文字提示快得多 —— 眼睛本来就已经落在这个字符上了。
+    if (wrong && i === matched) cls += ' bad';
     nodes.push(h('span', { class: cls }, target[i]));
     if ((i + 1) % 4 === 0) nodes.push(h('span', { class: 'gap' }, ' '));
     if ((i + 1) % 32 === 0) nodes.push(h('br'));
@@ -120,6 +123,11 @@ export function acceptInput(raw) {
     matched,
     total: target.length || gateTotal(),
     complete: matched >= target.length && target.length > 0,
+    // 有多余字符 = 这一下打错了（也可能是粘贴/脚本塞了东西被砍掉）。
+    // "错字即时提示"的来源就在这儿：`value` 被砍回正确前缀之后，
+    // 光看 `value.length` 已经看不出刚才发生过一次拒绝 —— 必须在这里记这一笔，
+    // 否则界面上永远风平浪静，敲错了也不知道，只能自己数格子。
+    rejected: typed.length > matched,
   };
 }
 
@@ -129,18 +137,21 @@ export function acceptInput(raw) {
  * 绝不能整棵重绘 —— 那会把 textarea 连同焦点一起换掉，
  * 正在打第 30 个字母的人会被弹回第 1 个。
  */
-export function syncGate(gate, input, matched) {
+export function syncGate(gate, input, matched, rejected = false) {
   const target = current()?.gate_text || '';
+  const complete = matched >= target.length && target.length > 0;
+  // `input` 永远只是正确前缀（acceptInput 砍过），所以"打错了"不能从
+  // `input.length` 推 —— 只能由 acceptInput 那一趟带出来。
+  const wrong = rejected && !complete;
+
   const passage = gate.querySelector('[data-role="gate-passage"]');
-  if (passage) passage.replaceChildren(...format(target, matched, input.length));
+  if (passage) passage.replaceChildren(...format(target, matched, wrong));
 
   const bar = gate.querySelector('[data-role="gate-progress"]');
   if (bar) bar.style.width = `${target.length ? (matched / target.length) * 100 : 0}%`;
 
   const status = gate.querySelector('[data-role="gate-status"]');
   const text = gate.querySelector('[data-role="gate-status-text"]');
-  const complete = matched >= target.length && target.length > 0;
-  const wrong = input.length > matched;
 
   if (status) status.dataset.state = complete ? 'ok' : wrong ? 'bad' : 'typing';
   if (text) {

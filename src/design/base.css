@@ -169,6 +169,10 @@ body[data-route="reminder"] {
   background: transparent;
 }
 
+/* 这 14px 不要随手调小。它和 `.reminder-stage` 的 14px 叠起来是 28px，
+   正好是卡片那层 `0 12px 32px` 阴影需要的空间（模糊 32px 的一半 + 下移 12px）。
+   窗口是透明无边框的，留白不够的话阴影会被窗口边缘齐齐切掉，
+   看起来就像卡片外面套了个方框 —— 这个毛病修过一次，别再退回去。 */
 body[data-route="reminder"] #app {
   padding: 14px;
 }

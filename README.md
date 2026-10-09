@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.1-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.2-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -135,9 +135,9 @@
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.1_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
+前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.2_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
 
-（本地自己打包的话，产物名还是 `缓缓_0.0.1_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.1_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
+（本地自己打包的话，产物名还是 `缓缓_0.0.2_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.2_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
 
 ### 首次打开被 macOS 拦下怎么办
 
@@ -194,6 +194,21 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 - [ ] 专注模式联动：在电脑全屏工作或游戏时智能静默。
 
 ## 版本记录
+
+### v0.0.2 (2026-10-09)
+
+修掉 v0.0.1 里几个"用着用着才发现"的问题。
+
+- **删掉的任务不再自己长回来**：删光所有任务后一重启，三个内置任务会重新出现 —— 现在空列表就是空列表。（只有配置里压根没有 `tasks` 这个键，也就是首次启动，才会铺内置任务。）
+- **居中浮窗不再是"方框套圆角"**：macOS 给透明窗口画的那层系统阴影是按**窗口矩形**算的，不认卡片自己的圆角，于是卡片四周会多出一圈方形灰边。现在关掉系统阴影，阴影交给卡片自己画。
+- **「稍后再说」不再显示 `(2)`**：括号里那个数字是"还剩几次推迟"，但看着像倒计时。软提醒现在**只给一次**推迟，按钮直接写「10 分钟后再提醒你」；推迟时长在 5 分钟或以内时，干脆不显示这个按钮 —— 等于没推，不如不给。（锁屏强制的推迟不受影响，它按任务配的次数来。）
+- **紧急闸门会告诉你打错了**：以前敲错一个字母只是被悄悄弹回，界面没有任何反应，只能自己数格子；现在打错的那一下，目标文本里该打的那个字符和输入框边框会**同时变红**。
+- **居中浮窗不再先闪一个白方块**：路由属性以前在启动流程的某个 `await` 之后才落下，透明底色晚了几帧才生效，于是浮窗起来时会先出现一个不透明矩形。
+- **弹提示不再清掉你正在打的字**：以前每弹一条提示都会整棵重绘，屏幕上所有输入框的焦点和半截草稿一起没。
+- **「你离开了，计时停着」这句终于会出现**：Rust 端一直在发空闲状态事件，前端从来没监听，那个标志位永远是 `false`。
+- **闸门进度真的会落盘了**：「重启后不用重打」这句话以前是假的 —— `lock.json` 里的 `gate_matched` 从来没有被更新过。
+- **发布流程里给 dmg 改名那一步修好了**：v0.0.1 的附件名是手工修补的。根因是 `gh release view --json assets` 给出的 `id` 是 node_id，而资产接口要的是数字 id（只藏在 `apiUrl` 最后一段），拿错了得到的是 **404 而不是 400**，看着像权限问题。
+- 清掉一批死代码：17 条没人引用的文案、4 条死 CSS 规则、以及若干空转的函数和导出。
 
 ### v0.0.1 (2026-10-09)
 

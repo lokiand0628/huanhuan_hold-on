@@ -190,6 +190,14 @@ const actions = createActions({
  */
 const inFlight = new Set();
 
+/**
+ * 居中浮窗给不给「稍后再说」，看推迟时长有没有超过这个数（分钟）。
+ *
+ * 5 分钟或更短的推迟等于没推 —— 话音刚落又弹一次，只会让人烦。
+ * 这条只针对**软提醒**；锁屏强制的推迟是另一套规则（次数由任务自己配）。
+ */
+const SNOOZE_MIN_MINUTES = 5;
+
 async function handleTrigger(payload) {
   const id = payload?.id;
   if (!id || inFlight.has(id)) return;
@@ -208,14 +216,18 @@ async function handleTrigger(payload) {
 
   // 居中浮窗：交给那个独立小窗，主窗口不弹任何东西。
   // 触发在这里就 ack 掉 —— 小窗关掉之后没有人会再来 ack 它。
+  const snoozeMinutes = task?.snoozeMinutes ?? 5;
+
   await api.ackTriggered(id);
   await api.enterReminder({
     id,
     title: taskTitle(task) || payload.title,
     desc: taskDesc(task) || payload.desc,
     icon: task?.icon || payload.icon || 'sparkles',
-    snoozeMinutes: task?.snoozeMinutes ?? 5,
-    maxSnooze: task?.maxSnooze ?? 3,
+    snoozeMinutes,
+    // 软提醒只给一次推迟，且推迟时长得够长才有意义 —— 判定理由见 Reminder.js。
+    // `from_snooze` 由后端给：这一条触发本身就是"上次按了稍后再说"的结果。
+    canSnooze: !payload.from_snooze && snoozeMinutes > SNOOZE_MIN_MINUTES,
   });
 }
 
@@ -346,8 +358,8 @@ async function bootReminder() {
 
   root.replaceChildren(
     renderReminder(payload, {
-      snoozeMinutes: payload.snoozeMinutes || 5,
-      snoozeLeft: payload.maxSnooze ?? 3,
+      snoozeMinutes: payload.snoozeMinutes ?? 5,
+      canSnooze: payload.canSnooze === true,
     })
   );
   assertHandlers(root, actions);

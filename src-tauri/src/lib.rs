@@ -588,12 +588,14 @@ mod tests {
             title: "Stand Up".to_string(),
             desc: String::new(),
             icon: "clock".to_string(),
+            from_snooze: false,
         };
         let eye_payload = TaskTriggeredPayload {
             id: "eye".to_string(),
             title: "Eye Rest".to_string(),
             desc: String::new(),
             icon: "eye".to_string(),
+            from_snooze: false,
         };
 
         enqueue_pending_trigger(&mut state, &sit_payload);
@@ -745,6 +747,12 @@ struct TaskTriggeredPayload {
     title: String,
     desc: String,
     icon: String,
+    /// 这一次触发，本身就是"上次按了稍后再说"的结果。
+    ///
+    /// 居中浮窗靠它兑现"只能再提醒一次"：软提醒只让推迟一回，
+    /// 推迟到点再弹出来的那一次，就不再给推迟按钮了。
+    /// 锁屏强制不看这个字段 —— 它的推迟次数是另一套规则（`snooze_count`）。
+    from_snooze: bool,
 }
 
 fn rebuild_tray_menu(app: &AppHandle) {
@@ -2296,6 +2304,9 @@ fn start_timer_thread(app_handle: AppHandle) {
                                     title: timer.config.title.clone(),
                                     desc: timer.config.desc.clone(),
                                     icon: timer.config.icon.clone(),
+                                    // 清 `snoozed` 之前先记下它 —— 这一条正是"推迟到点
+                                    // 又弹出来"的那个，浮窗据此不再给第二次推迟。
+                                    from_snooze: timer.snoozed,
                                 });
                                 timer.triggered = true;
                                 timer.snoozed = false;
@@ -2311,6 +2322,7 @@ fn start_timer_thread(app_handle: AppHandle) {
                                         title: timer.config.title.clone(),
                                         desc: timer.config.desc.clone(),
                                         icon: timer.config.icon.clone(),
+                                        from_snooze: false,
                                     });
                                     timer.daily_last_trigger_key = Some(key);
                                     timer.triggered = true;
@@ -2327,6 +2339,7 @@ fn start_timer_thread(app_handle: AppHandle) {
                                     title: timer.config.title.clone(),
                                     desc: timer.config.desc.clone(),
                                     icon: timer.config.icon.clone(),
+                                    from_snooze: false,
                                 });
 
                                 // 标记为已触发，等待用户操作（重置或推迟）
@@ -2564,6 +2577,10 @@ fn enter_reminder(app: AppHandle, payload: serde_json::Value) -> Result<(), Stri
     // 透明底：卡片是圆角的，窗口不透明的话圆角外面会是一块白。
     // macOS 上这还要求 tauri.conf.json 里的 macOSPrivateApi = true。
     .transparent(true)
+    // 关掉系统的窗口阴影。macOS 给透明窗口画的那层阴影是按**窗口矩形**算的，
+    // 不认里面的圆角，于是卡片四周会多出一圈方形灰边 —— 看着像窗口比自己
+    // 的内容大了一块。阴影交给卡片自己的 `box-shadow` 画。
+    .shadow(false)
     .always_on_top(true)
     .skip_taskbar(true)
     .focused(true)

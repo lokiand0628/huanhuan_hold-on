@@ -16,7 +16,7 @@ import { h } from '../ui/dom.js';
 import { colorForIcon, icon, iconForTask } from '../ui/icons.js';
 import { S } from '../core/strings.js';
 
-export function renderReminder(payload, { snoozeMinutes, snoozeLeft }) {
+export function renderReminder(payload, { snoozeMinutes, canSnooze }) {
   const data = payload || {};
   const title = data.title || data.name || S.appName;
   const desc = data.desc || '';
@@ -44,7 +44,12 @@ export function renderReminder(payload, { snoozeMinutes, snoozeLeft }) {
         icon('check', { size: 16 }),
         S.reminderConfirm
       ),
-      snoozeLeft > 0
+      // 推迟按钮只在两种情况下出现，由 main.js 判定后传进来：
+      //   1. 这次触发不是推迟来的 —— 软提醒只让推迟一次，推迟到点弹出来的
+      //      那一次就只剩「知道了」，否则可以无限推下去；
+      //   2. 推迟时长大于 5 分钟 —— 只有 5 分钟或更短的话，
+      //      "5 分钟后再提醒你"几乎等于没推，不如不给这个按钮。
+      canSnooze
         ? h(
             'button',
             { class: 'btn btn-ghost btn-block', dataset: { act: 'reminder-snooze' } },

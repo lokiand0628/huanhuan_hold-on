@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.1-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.2-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -182,7 +182,7 @@ Built for minimal memory use and startup time:
 
 ## Download and install
 
-Grab `Huanhuan_0.0.1_aarch64.dmg` from
+Grab `Huanhuan_0.0.2_aarch64.dmg` from
 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases), open it and
 drag 缓缓 into Applications.
 
@@ -251,6 +251,42 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.2 (2026-10-09)
+
+Fixes for a handful of problems in v0.0.1 that only showed up in use.
+
+- **Deleted tasks stay deleted**: after deleting every task, a restart brought the three
+  built-in ones back. An empty list is now an empty list. (Built-ins are seeded only when
+  the config has no `tasks` key at all — i.e. first launch.)
+- **The centered popup is no longer "a square frame around a rounded card"**: the system
+  shadow macOS draws for a transparent window follows the window **rectangle**, not the
+  card's rounded corners, so a grey square edge appeared around the card. The system
+  shadow is now off; the card draws its own.
+- **"Snooze" no longer shows `(2)`**: that number was "snoozes remaining" but read like a
+  countdown. A soft reminder now offers **exactly one** snooze, labelled "remind me again
+  in 10 minutes"; when the snooze length is 5 minutes or less the button is dropped
+  entirely, since it amounts to no snooze at all. (The forced lock screen is unaffected —
+  it counts snoozes per task as configured.)
+- **The gate now tells you when you mistype**: a wrong letter used to be silently
+  swallowed with no visible reaction, leaving you to count characters. Now the character
+  you were supposed to type, and the input border, both turn red on the bad keystroke.
+- **The centered popup no longer flashes an opaque rectangle**: the route attribute was
+  set after an `await` in the boot path, so the transparent background took a few frames
+  to apply.
+- **Toasts no longer wipe what you're typing**: every toast used to trigger a full
+  re-render, taking the focus and half-typed draft of every input on screen with it.
+- **"You left, the clock is paused" finally appears**: Rust has been emitting the idle
+  status event all along; the frontend never listened, so the flag stayed `false`.
+- **Gate progress is actually persisted**: "no need to retype after a restart" was not
+  true — `gate_matched` in `lock.json` was never updated.
+- **Fixed the dmg rename step in the release workflow**: v0.0.1's asset name was patched
+  by hand. The root cause is that the `id` from `gh release view --json assets` is a
+  node_id while the asset endpoint wants the numeric id (only in the last segment of
+  `apiUrl`); the wrong one returns **404, not 400**, which reads like a permissions
+  problem.
+- Removed a batch of dead code: 17 unreferenced strings, 4 dead CSS rules, and a number
+  of inert functions and exports.
 
 ### v0.0.1 (2026-10-09)
 

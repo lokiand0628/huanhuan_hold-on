@@ -447,7 +447,7 @@ export function createActions(ctx) {
 
     /** 闸门输入：就地更新，绝不重绘 */
     'gate-input:input'(el) {
-      const { value, matched } = acceptInput(el.value);
+      const { value, matched, rejected } = acceptInput(el.value);
       if (el.value !== value) {
         // 弹回多余字符，并把光标放在末尾
         const at = Math.min(matched, value.length);
@@ -455,7 +455,9 @@ export function createActions(ctx) {
         el.setSelectionRange(at, at);
       }
       onGateInput(value);
-      syncGate(el.closest('.gate'), value, matched);
+      // `rejected` 要一路带到 syncGate：字符被弹回之后，界面上只剩"什么都没发生"，
+      // 不把这一下拒绝显式画出来，敲错的人只能自己数到第几个字母才发现。
+      syncGate(el.closest('.gate'), value, matched, rejected);
       scheduleGateCommit(matched);
     },
 

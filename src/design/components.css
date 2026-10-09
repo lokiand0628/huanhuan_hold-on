@@ -1047,6 +1047,14 @@
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* 刚敲错的那一下：光标位置由蓝转红。
+   跟 .gate textarea.bad 一起构成"错字即时提示" —— 位置和输入框边框同时变红。 */
+.gate .passage .here.bad {
+  color: var(--danger);
+  background: rgba(255, 75, 75, 0.18);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+
 .gate .passage .gap {
   opacity: 0.5;
 }

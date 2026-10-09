@@ -159,7 +159,11 @@ export function normalize(raw) {
   settings.idleThreshold = clampInt(settings.idleThreshold, 30, 3600, 300);
   settings.lockDuration = clampInt(settings.lockDuration, DURATION_MIN, DURATION_MAX, 60);
 
-  const tasks = Array.isArray(source.tasks) && source.tasks.length ? source.tasks : defaultTasks();
+  // 只有**压根没有 `tasks` 这个键**才算"没配置过"，才铺内置任务。
+  // 空数组是用户明确删光了，不是缺配置 —— 这里曾经写成
+  // `Array.isArray(source.tasks) && source.tasks.length`，于是删光之后一重启，
+  // 三个内置任务就自己长回来，看起来像"删不掉"。
+  const tasks = Array.isArray(source.tasks) ? source.tasks : defaultTasks();
   settings.tasks = tasks.map(normalizeTask);
 
   return settings;
