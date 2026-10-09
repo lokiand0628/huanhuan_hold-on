@@ -2,9 +2,9 @@ use chrono::{Local, Timelike};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{
@@ -2363,9 +2363,48 @@ fn start_timer_thread(app_handle: AppHandle) {
     });
 }
 
+/// 配置目录。跟着应用的名字走（缓缓 → `huanhuan`）。
+///
+/// 第一次访问时顺手搬一次家，见 `migrate_legacy_config`。用 `Once` 保证
+/// 无论从哪条命令先进来，搬家都已经做过了 —— 这几个入口（`load_settings`、
+/// `get_pending_lock`）在启动期是并发的，靠"在 setup 里先跑一遍"来排序不可靠。
+fn config_dir() -> PathBuf {
+    static MIGRATED: Once = Once::new();
+    let dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("huanhuan");
+    MIGRATED.call_once(|| migrate_legacy_config(&dir));
+    dir
+}
+
+/// 把早期版本写在 `desk-reminder/` 下的配置搬过来。
+///
+/// 用**复制**而不是移动：老目录留着当兜底（用户看不见它），而这里搬的是
+/// 全部任务配置和可能正在生效的强制锁状态 —— 迁完就删的话，这段代码本身
+/// 出一点错就是不可逆的。复制失败的后果只是回到默认配置，不是丢文件。
+fn migrate_legacy_config(new_dir: &Path) {
+    if new_dir.exists() {
+        return;
+    }
+    let legacy = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("desk-reminder");
+    if !legacy.is_dir() {
+        return;
+    }
+    if fs::create_dir_all(new_dir).is_err() {
+        return;
+    }
+    for name in ["settings.json", "lock.json"] {
+        let src = legacy.join(name);
+        if src.is_file() {
+            let _ = fs::copy(&src, new_dir.join(name));
+        }
+    }
+}
+
 fn get_settings_path() -> PathBuf {
-    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    config_dir.join("desk-reminder").join("settings.json")
+    config_dir().join("settings.json")
 }
 
 #[tauri::command]
@@ -2388,8 +2427,7 @@ fn save_settings(settings: String) -> Result<(), String> {
 const LOCK_SCHEMA_VERSION: u64 = 1;
 
 fn get_lock_state_path() -> PathBuf {
-    let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    config_dir.join("desk-reminder").join("lock.json")
+    config_dir().join("lock.json")
 }
 
 /// 原子写：先写同目录临时文件并 fsync，再 rename 覆盖。

@@ -182,7 +182,7 @@ Built for minimal memory use and startup time:
 
 ## Download and install
 
-Grab `缓缓_0.0.1_aarch64.dmg` from
+Grab `Huanhuan_0.0.1_aarch64.dmg` from
 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases), open it and
 drag 缓缓 into Applications.
 

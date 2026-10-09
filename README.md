@@ -135,7 +135,9 @@
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `缓缓_0.0.1_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
+前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.1_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
+
+（本地自己打包的话，产物名还是 `缓缓_0.0.1_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.1_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
 
 ### 首次打开被 macOS 拦下怎么办
 

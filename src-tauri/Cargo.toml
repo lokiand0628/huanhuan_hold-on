@@ -1,12 +1,12 @@
 [package]
-name = "health-reminder"
+name = "huanhuan"
 version = "0.0.1"
 description = "Hold On（缓缓）— 事缓则圆，不着急"
 authors = ["you"]
 edition = "2021"
 
 [lib]
-name = "desk_reminder_lib"
+name = "huanhuan_lib"
 crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]

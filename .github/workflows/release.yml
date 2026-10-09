@@ -79,3 +79,24 @@ jobs:
           # createUpdaterArtifacts 已关（见 tauri.conf.json），所以不需要
           # TAURI_SIGNING_PRIVATE_KEY，也不会产出 latest.json。
           args: --target aarch64-apple-darwin --bundles dmg
+
+      # productName 是「缓缓」，Tauri 产出的 dmg 因此叫 `缓缓_0.0.1_aarch64.dmg`。
+      # GitHub 上传资产时会把非 ASCII 的前缀整段抹掉，最后挂上去的只剩
+      # `_0.0.1_aarch64.dmg` —— 下载下来像个坏文件。这里把**资产名**改成 ASCII 的，
+      # release 标题里的「缓缓」不受影响。
+      - name: Give the dmg an ASCII filename
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.ref_name }}"
+          gh release view "$tag" --repo "${{ github.repository }}" \
+              --json assets \
+              --jq '.assets[] | select(.name | endswith(".dmg")) | "\(.id) \(.name)"' |
+          while read -r id name; do
+            if [ "${name#Huanhuan_}" != "$name" ]; then
+              continue
+            fi
+            gh api -X PATCH \
+              "repos/${{ github.repository }}/releases/assets/$id" \
+              -f "name=Huanhuan_${tag#v}_aarch64.dmg" >/dev/null
+          done
