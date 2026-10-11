@@ -15,7 +15,10 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # macos-private-api：无边框的「居中浮窗」要透明底（圆角外面不能是一块白）。
 # 在 macOS 上开透明窗口必须走这个 feature，配套 tauri.conf.json 的 macOSPrivateApi。
-# 注意这里只加 feature，**不要**动版本 —— 详见文件末尾关于依赖漂移的注释。
+# 版本保持 "2"，实际版本由 Cargo.lock 钉住。升级 Tauri 必须**整族同代一起**
+# （tauri / tauri-runtime / tauri-runtime-wry / tauri-macros / wry / tao）——
+# 只升一支会在 shared_app_impl! 宏展开处报 Option<Monitor>/Result、UnexpectedMenuKind
+# 之类的错（2.11.1 配 2.12 的 runtime 就是这么炸的，2026-10-11 实测）。
 tauri = { version = "2", features = ["protocol-asset", "tray-icon", "macos-private-api"] }
 tauri-plugin-shell = "2"
 tauri-plugin-notification = "2"
@@ -31,9 +34,9 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-dialog = "2"
 chrono = "0.4"
 rodio = "0.21.1"
-# 精确钉住：2.4+ 要求 tauri ^2.10、2.5+ 要求 ^2.12，会让 cargo 顺手把整个
-# Tauri 框架升上去（试过一次，tauri 2.9.5 一路被拽到 2.12.2）。
-# 用 `=` 是为了让将来误升时**报错**而不是静默升级框架。
+# 精确钉住：升级它是一轮单独的行为变更（2.4+ 引入 tokio、新版深链机制），
+# 要单独评估 + 单独测试，不搭框架升级的车。用 `=` 是为了让将来误升时**报错**
+# 而不是静默把它拽上去。
 tauri-plugin-single-instance = "=2.3.7"
 
 [target.'cfg(windows)'.dependencies]
