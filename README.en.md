@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.3-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.4-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -182,7 +182,7 @@ Built for minimal memory use and startup time:
 
 ## Download and install
 
-Grab `Huanhuan_0.0.3_aarch64.dmg` from
+Grab `Huanhuan_0.0.4_aarch64.dmg` from
 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases), open it and
 drag 缓缓 into Applications.
 
@@ -251,6 +251,22 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.4 (2026-10-11)
+
+A dependency-level security release — no UI or behaviour changes.
+
+- **Tauri upgraded as a family** `2.9.5 → 2.12.3` (runtime / wry / tao moved in
+  step), fixing a medium-severity framework advisory (Origin Confusion). The
+  frontend `@tauri-apps/api` / `@tauri-apps/cli` packages moved to 2.12 as well —
+  `tauri build` refuses to run when the two sides are different generations.
+- **npm dependency fix**: `source-map-js` `1.2.1 → 1.2.2` (high-severity DoS fix).
+- **GitHub Actions bumped to their node24 releases** (checkout v7 / setup-node v7 /
+  cache v6), clearing the Node 20 deprecation warning.
+
+Note: two remaining upstream advisories (`rand 0.7.3`, `glib 0.18`) cannot be
+resolved locally — the former is used at build time only, the latter is a
+Linux-only dependency; neither ships in the macOS bundle.
 
 ### v0.0.3 (2026-10-11)
 

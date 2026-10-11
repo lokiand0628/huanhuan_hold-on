@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.3-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.4-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -113,9 +113,9 @@
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.3_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
+前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.4_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
 
-（本地自己打包的话，产物名还是 `缓缓_0.0.3_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.3_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
+（本地自己打包的话，产物名还是 `缓缓_0.0.4_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.4_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
 
 ### 首次打开被 macOS 拦下怎么办
 
@@ -166,6 +166,16 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 ---
 
 ## 版本记录
+
+### v0.0.4 (2026-10-11)
+
+一次依赖层面的安全升级，界面与行为没有变化。
+
+- **Tauri 框架整族升级** `2.9.5 → 2.12.3`（runtime / wry / tao 同代跟上），修掉框架层的中危漏洞（Origin Confusion）。前端 `@tauri-apps/api` / `@tauri-apps/cli` 同步到 2.12 —— 两边不同代时 `tauri build` 会直接拒绝构建。
+- **npm 依赖修复**：`source-map-js` `1.2.1 → 1.2.2`（高危 DoS 修复）。
+- **GitHub Actions 升到 node24 版本**（checkout v7 / setup-node v7 / cache v6），消除 Node 20 弃用警告。
+
+注：另有两条上游告警（`rand 0.7.3`、`glib 0.18`）在本地无法消除 —— 前者只用于构建期、后者是 Linux 专用依赖，都不进入 macOS 安装包。
 
 ### v0.0.3 (2026-10-11)
 

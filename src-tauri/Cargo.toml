@@ -1,6 +1,6 @@
 [package]
 name = "huanhuan"
-version = "0.0.3"
+version = "0.0.4"
 description = "Hold On（缓缓）— 事缓则圆，不着急"
 authors = ["you"]
 edition = "2021"
