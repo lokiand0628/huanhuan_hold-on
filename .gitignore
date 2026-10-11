@@ -30,5 +30,6 @@ src-tauri/gen/
 
 # 本地工具配置
 .claude/
+.workbuddy/
 
 *.docx
