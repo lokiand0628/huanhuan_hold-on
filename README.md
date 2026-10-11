@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.2-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.3-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -94,7 +94,7 @@
 ### 2. 贴心不打扰
 
 - **提前预告**：每项任务可独立设置提前几秒给出预警，让你先把手里那半句话说完。
-- **可控推迟**：每项任务可设置推迟时长与最大次数，次数用完就只剩「完成休息」。
+- **可控推迟**：推迟时长每项任务可设。但推迟只给一次 —— 软提醒和锁屏强制都是，推迟到点再弹出来的那一次就只剩「确认 / 完成休息」一个出口。
 - **离开电脑就重新计时**：人不在的时候不该催你休息，回来后也不会立刻被弹一脸。
 - **休息时处理视频音乐**：不处理 / 只暂停视频 / 全部暂停，三档，默认不打断音乐。
 - **静默自启**：随系统登录启动并直接待在托盘，不在开机时弹窗。
@@ -103,7 +103,7 @@
 
 - **完整的任务系统**：内置久坐、喝水、护眼，也可添加任意自定义任务，多项提醒彼此独立并行。
 - **两种调度**：每隔若干分钟触发，或每天固定多个时间点，例如 11:00 运动、21:00 泡脚。
-- **任务级控制**：每项任务独立启停、暂停、重置，并配置间隔、提醒方式、休息时长、预告、推迟策略。
+- **任务级控制**：每项任务独立启停、暂停、重置，并配置间隔、提醒方式、休息时长、预告、推迟时长。
 - **休息时长随便设**：秒 / 分钟 / 小时三档单位，最长 12 小时。想休息两小时就选「小时」敲个 2，不必按 119 次加号。**把时长改大到 10 分钟以上要先过指纹或开机密码**，往小改则不用 —— 「今天想轻松点」不该被自己的工具拦住。
 - **快捷批量操作**：主界面和托盘都支持全部暂停 / 继续 / 重置，托盘还能单独重置某个任务。
 - **后台精准计时**：计时跑在 Rust 后端线程上，不受窗口最小化或 macOS App Nap 节流影响。
@@ -113,9 +113,9 @@
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.2_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
+前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.3_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
 
-（本地自己打包的话，产物名还是 `缓缓_0.0.2_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.2_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
+（本地自己打包的话，产物名还是 `缓缓_0.0.3_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.3_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
 
 ### 首次打开被 macOS 拦下怎么办
 
@@ -166,6 +166,14 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 ---
 
 ## 版本记录
+
+### v0.0.3 (2026-10-11)
+
+修掉几个手测才发现的问题。
+
+- **锁屏强制的「推迟」不再可以无限点**：推迟资格从前记在 `lock.json` 里，而点一次推迟会结束整场锁、连文件一起删掉 —— 于是每一轮都从满格重新开始，「还能推迟 3 次」永远不变、想点几次点几次。现在推迟**只给一次**，和软提醒同一条规则：推迟到点再弹出来的那一次只剩「完成休息」。任务设置里的「最多推迟几次」随之移除 —— 没有次数可配了。
+- **居中浮窗点一下「知道了」就能关**：macOS 的 WebView 默认不接收未激活窗口上的第一次点击（那一下只拿来把窗口带到前台），所以要点两下。浮窗现在开了「第一次点击直接生效」。
+- **确认过的提醒不再「哑掉」**：点「知道了」/「推迟」时，代码先把浮窗关掉再上报后端 —— 窗口一没，上报就静默丢失，那条提醒的 `triggered` 卡住，此后**永远不会再响**（要重启才恢复）。现在顺序倒过来：先结清、后关窗。
 
 ### v0.0.2 (2026-10-10)
 

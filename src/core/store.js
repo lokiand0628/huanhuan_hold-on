@@ -134,7 +134,7 @@ export function normalizeTimes(value) {
  *   forceMode            闸门现在是常驻的，不再是开关
  *   enableMerge / mergeThreshold   不再做"合并提醒"
  *   focusSticky / autoFinish       柔和提醒现在恒为"确认才消失"
- *   maxSnoozeCount                 改成每个提醒自己的 maxSnooze
+ *   maxSnoozeCount / maxSnooze     推迟恒为一次，不再是可配置的次数
  *   language / language_switch_hint  只剩中文
  *   checkUpdatesOnLaunch           本来就没有任何代码读它
  *   floatingWindow* ×13            悬浮窗子系统整个删了
@@ -213,7 +213,6 @@ function normalizeTask(rawTask) {
       : bestUnit(clampInt(rawTask?.lockDuration, DURATION_MIN, DURATION_MAX, 60)),
     preNotificationSeconds: clampInt(rawTask?.preNotificationSeconds, 0, 300, 5),
     snoozeMinutes: clampInt(rawTask?.snoozeMinutes, 1, 120, base?.snoozeMinutes ?? 5),
-    maxSnooze: clampInt(rawTask?.maxSnooze, 0, 10, 3),
     autoResetOnIdle: rawTask?.autoResetOnIdle !== false,
   };
 
@@ -238,7 +237,6 @@ export function newTask() {
     lockDuration: water?.lockDuration ?? 60,
     preNotificationSeconds: water?.preNotificationSeconds ?? 5,
     snoozeMinutes: water?.snoozeMinutes ?? 5,
-    maxSnooze: water?.maxSnooze ?? 3,
   });
 }
 

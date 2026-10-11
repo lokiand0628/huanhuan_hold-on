@@ -99,7 +99,7 @@ function render() {
       renderLock({
         gateOpen: !!state.lock.gateOpen,
         gateInput: state.lock.gateInput || '',
-        snoozeLeft: state.lock.snoozeLeft ?? 0,
+        canSnooze: !!state.lock.canSnooze,
         snoozeMinutes: state.lock.snoozeMinutes ?? 5,
         slave: IS_SLAVE,
       })
@@ -158,25 +158,31 @@ const actions = createActions({
     },
   },
   reminder: {
+    // 顺序是**先结清、后关窗**，不能反。
+    //
+    // `exitReminder` 走的是 Rust 的 `destroy()`，窗口一没，后面那两个 invoke
+    // 就没有接收方了：`ackTriggered` / `resetTask` 会静默丢失，任务的
+    // `triggered` 一直停在 true —— 那条提醒此后**再也不会响**（要等重启或
+    // 重新排期）。这不是假想的竞态，destroy 就在那个命令里同步执行。
     async finish() {
       const payload = state.focus;
-      await api.exitReminder();
       if (payload?.id) {
         await api.ackTriggered(payload.id);
         const task = taskById(payload.id);
         if (task) await api.resetTask(task.id);
       }
       state.focus = null;
+      await api.exitReminder();
       window.close();
     },
     async snooze() {
       const payload = state.focus;
-      await api.exitReminder();
       if (payload?.id) {
         await api.ackTriggered(payload.id);
         await api.snoozeTask(payload.id, payload.snoozeMinutes || 5);
       }
       state.focus = null;
+      await api.exitReminder();
       window.close();
     },
   },
@@ -210,7 +216,15 @@ async function handleTrigger(payload) {
 
   if (task && task.reminderMode === 'lock') {
     await api.ackTriggered(id);
-    await startLockUI(task);
+    // 锁屏强制的推迟**只给一次**，和软提醒同一条规则：推迟到点又弹出来的
+    // 那一次不再给出口（`from_snooze` 由后端给：这一条触发本身就是"上次按了
+    // 推迟"的结果）。
+    //
+    // 从前这里把预算交给任务的「最多推迟几次」，但推迟是**结束整场锁**
+    // 再重新排期，锁一结束 `lock.json` 连同预算一起没了 —— 下一次触发又是
+    // 满格，于是次数永远停在 3、可以无限推。改成"一次"之后这个数不再需要
+    // 跨越多次触发去记，也就没有可丢的地方了。
+    await startLockUI(task, { canSnooze: !payload.from_snooze });
     return;
   }
 

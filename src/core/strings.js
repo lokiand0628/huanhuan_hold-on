@@ -48,14 +48,12 @@ export const S = {
   taskLockDuration: '休息多久',
   taskPreNotify: '提前几秒提醒',
   taskSnooze: '可以推迟几分钟',
-  taskMaxSnooze: '最多推迟几次',
   deleteTask: '删除这个提醒',
   deleteTaskConfirm: title => `删除「${title}」？这个操作撤不回来。`,
   newTaskTitle: '新提醒',
   minutes: '分钟',
   seconds: '秒',
   hours: '小时',
-  times: '次',
 
   // 休息时长超过这道线，往大改就要验指纹 —— 见 actions.js 的 applyDuration。
   // 这是自律工具里唯一一处"加码需要授权"的地方：临时起意把 30 分钟改成
@@ -118,7 +116,11 @@ export const S = {
   lockRemaining: '剩余时间',
   lockFinish: '完成休息',
   lockSnooze: minutes => `推迟 ${minutes} 分钟`,
-  lockSnoozeLeft: n => `还能推迟 ${n} 次`,
+  // 锁屏强制的推迟和软提醒一样只给一次 —— 这句不报次数，只把"仅此一次"说明白。
+  // 从前这里是「还能推迟 N 次」，而那个 N 永远停在初始值：预算存在 lock.json 里，
+  // 推迟会整场结束这次锁、连文件一起删掉，下一次触发又是满格。写一个不会变的
+  // 数字比不写更糟 —— 它让人以为还有很多次，然后发现可以无限点。
+  lockSnoozeOnce: '只有这一次，到点会重新开始休息',
   lockEmergency: '紧急情况，需要继续用电脑',
   lockGateTitle: '输入下面这段文字来解除',
 

@@ -1155,7 +1155,7 @@
   gap: 4px;
 }
 
-.lock-snooze-left {
+.lock-snooze-note {
   text-align: center;
   font-size: var(--type-micro);
   color: var(--lock-ink-dim);

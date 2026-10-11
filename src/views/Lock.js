@@ -21,7 +21,7 @@ import { renderGate } from './Gate.js';
 const RADIUS = 116;
 const CIRCUM = 2 * Math.PI * RADIUS;
 
-export function renderLock({ gateOpen, gateInput, snoozeLeft = 0, snoozeMinutes = 5, slave = false }) {
+export function renderLock({ gateOpen, gateInput, canSnooze = false, snoozeMinutes = 5, slave = false }) {
   const record = current();
   if (!record) return h('div', { class: 'lock-screen' }, h('div', { class: 'lock-kicker' }, S.lockKicker));
 
@@ -40,7 +40,7 @@ export function renderLock({ gateOpen, gateInput, snoozeLeft = 0, snoozeMinutes 
   // 副屏只负责"把休息这件事铺满每一块屏幕"，按钮和闸门都留在主屏。
   // 副屏上放一个「完成」会造成两块屏幕上两个都能点的出口。
   if (!slave) {
-    screen.append(renderActions({ done: left <= 0, snoozeLeft, snoozeMinutes }));
+    screen.append(renderActions({ done: left <= 0, canSnooze, snoozeMinutes }));
     screen.append(renderGateArea({ gateOpen, gateInput }));
   }
 
@@ -97,7 +97,7 @@ function bgLayer(path) {
 
 /* ============================== 按钮 ============================== */
 
-function renderActions({ done, snoozeLeft, snoozeMinutes }) {
+function renderActions({ done, canSnooze, snoozeMinutes }) {
   return h(
     'div',
     { class: 'lock-actions' },
@@ -111,7 +111,11 @@ function renderActions({ done, snoozeLeft, snoozeMinutes }) {
       icon('check', { size: 16 }),
       S.lockFinish
     ),
-    snoozeLeft > 0
+    // 推迟是**一次性的**：只有本次触发之前没用过推迟，才有这个按钮 ——
+    // 推迟到点又弹出来的那一次 `canSnooze` 是 false，只剩「完成休息」。
+    // 按钮下面那句小字把"仅此一次"说明白；从前写的是"还能推迟 N 次"，
+    // 而那是个永远停在初始值的数字（见 lockstate.js 的 startLock）。
+    canSnooze
       ? h(
           'div',
           { class: 'lock-snooze' },
@@ -120,7 +124,7 @@ function renderActions({ done, snoozeLeft, snoozeMinutes }) {
             { class: 'btn btn-ghost btn-block', dataset: { act: 'lock-snooze' } },
             S.lockSnooze(snoozeMinutes)
           ),
-          h('div', { class: 'lock-snooze-left' }, S.lockSnoozeLeft(snoozeLeft))
+          h('div', { class: 'lock-snooze-note' }, S.lockSnoozeOnce)
         )
       : null
   );

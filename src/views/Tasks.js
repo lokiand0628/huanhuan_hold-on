@@ -215,12 +215,10 @@ function renderBody(task) {
     task.reminderMode === 'lock' ? field(S.taskLockDuration, durationPicker(task)) : null,
     field(S.taskPreNotify, stepperFor(task, 'preNotificationSeconds', 0, 300, S.seconds)),
     field(S.taskSnooze, stepperFor(task, 'snoozeMinutes', 1, 120, S.minutes)),
-    // 「可推迟几次」只对锁屏强制有效：软提醒（居中浮窗）现在**只给一次**推迟，
-    // 根本不看这个数（见 main.js 算 canSnooze 的地方）。摆一个不起作用的设置
-    // 比不摆更糟 —— 用户会以为调大它就能多推几次。
-    task.reminderMode === 'lock'
-      ? field(S.taskMaxSnooze, stepperFor(task, 'maxSnooze', 0, 10, S.times))
-      : null,
+    // 这里**没有**「最多推迟几次」：软提醒和锁屏强制现在都只给一次推迟，
+    // 没有次数可配。从前那个设置项只喂给锁屏强制，但推迟会整场结束这次锁、
+    // 连预算一起删掉 —— 下一次触发又从满格开始，"3 次"可以无限点。
+    // 见 lockstate.js 的 startLock。
     h(
       'button',
       { class: 'btn btn-ghost btn-sm', dataset: { act: 'delete-task', id: task.id } },

@@ -749,9 +749,10 @@ struct TaskTriggeredPayload {
     icon: String,
     /// 这一次触发，本身就是"上次按了稍后再说"的结果。
     ///
-    /// 居中浮窗靠它兑现"只能再提醒一次"：软提醒只让推迟一回，
-    /// 推迟到点再弹出来的那一次，就不再给推迟按钮了。
-    /// 锁屏强制不看这个字段 —— 它的推迟次数是另一套规则（`snooze_count`）。
+    /// 两条提醒路径都靠它兑现"推迟只给一次"：软提醒和锁屏强制都一样，
+    /// 推迟到点再弹出来的那一次不再给推迟按钮。锁屏强制从前看任务的
+    /// `max_snooze` 预算，但那份预算随 lock.json 每轮重建、永远满格 ——
+    /// 现在两边统一由这个字段裁决。
     from_snooze: bool,
 }
 
@@ -2574,6 +2575,14 @@ fn enter_reminder(app: AppHandle, payload: serde_json::Value) -> Result<(), Stri
     .inner_size(400.0, 300.0)
     .resizable(false)
     .decorations(false)
+    // WKWebView 的 `acceptsFirstMouse` 默认是 NO：窗口不是 key window 时，
+    // 那一下按下只会被拿去激活窗口，**不会**传给网页。表现就是"知道了"
+    // 得点两次 —— 第一下把窗口点到前台，第二下才真的点到按钮。
+    // 浮窗是在用户正干着别的活的时候弹出来的，几乎总是这种情况，所以必须开。
+    //
+    // 顺带一提：tauri.conf.json 里的 `acceptFirstMouse` 只管 config 里声明的
+    // 那扇窗，浮窗是这里手动建出来的，配置管不到它。
+    .accept_first_mouse(true)
     // 透明底：卡片是圆角的，窗口不透明的话圆角外面会是一块白。
     // macOS 上这还要求 tauri.conf.json 里的 macOSPrivateApi = true。
     .transparent(true)

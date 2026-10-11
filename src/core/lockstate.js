@@ -96,7 +96,13 @@ export function progress() {
  * 由一次真实触发进入强制锁。
  *
  * @param {object} task     触发它的任务（可能已被删除 —— 所以字段要抄进 record）
- * @param {object} options  durationSecs / bgImage / skipSnooze
+ * @param {object} options  durationSecs / bgImage / canSnooze
+ *
+ * `canSnooze` 由调用方裁决（见 main.js 的 handleTrigger）：锁屏强制的推迟
+ * **只给一次**，所以它是 true/false，不是一个"还剩几次"的计数。
+ * 从前这里放的是任务的 `maxSnooze` 次数预算，但预算活在 `lock.json` 里、
+ * 而推迟会整场结束这次锁并把文件删掉，于是每轮都从满格重新开始 ——
+ * 次数显示永远不变，推迟可以无限点。**不留可丢的计数，就没有可丢的东西。**
  */
 export async function startLock(task, options = {}) {
   const durationSecs = Math.max(
@@ -116,11 +122,11 @@ export async function startLock(task, options = {}) {
     elapsedAtCheckpoint: 0,
     gateText: newGateText(),
     gateMatched: 0,
-    // 推迟预算也一并落盘：恢复出来的锁不该因为"任务已经被删了"就变成不能推迟，
-    // 也不该反过来凭空多出几次推迟机会
+    // 推迟的出口资格也一并落盘：恢复出来的锁不该凭空多出一次推迟机会，
+    // 也不该因为"任务已经被删了"就变成完全不能推迟。
     extra: {
       snooze_minutes: task?.snoozeMinutes ?? 5,
-      max_snooze: Math.max(0, task?.maxSnooze ?? 3),
+      max_snooze: options.canSnooze ? 1 : 0,
     },
   });
 
@@ -222,7 +228,9 @@ function makeViewState(record_) {
     total: record_.duration_secs,
     gateOpen: false,
     gateInput: '',
-    snoozeLeft: record_.max_snooze ?? 0,
+    // `max_snooze` 落盘时是 0/1，这里就照它译成"给不给推迟出口"。
+    // 用布尔而不是数字，是为了让视图不可能再把它当成"还剩几次"去显示。
+    canSnooze: (record_.max_snooze ?? 0) > 0,
     snoozeMinutes: record_.snooze_minutes ?? 5,
   };
 }
@@ -245,6 +253,9 @@ async function engage(built) {
     duration: built.duration_secs,
     icon: built.icon,
     strict_mode: true,
+    // `max_snooze` 现在是 0/1 的"给不给推迟出口"（见 startLock），照形映射。
+    // 这两个字段只进副屏窗口的 URL（Rust 的 create_slave_window），副屏不画
+    // 按钮 —— 形状对得上 `LockTaskArgs` 就行。
     allow_strict_snooze: (built.max_snooze ?? 0) > 0,
     max_snooze_count: built.max_snooze ?? 0,
     snooze_minutes: built.snooze_minutes ?? 5,

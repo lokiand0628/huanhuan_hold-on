@@ -40,7 +40,6 @@ const TASK_STEPS = {
   interval: [1, 1440],
   preNotificationSeconds: [0, 300],
   snoozeMinutes: [1, 120],
-  maxSnooze: [0, 10],
 };
 
 /**

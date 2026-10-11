@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.2-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.3-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -182,7 +182,7 @@ Built for minimal memory use and startup time:
 
 ## Download and install
 
-Grab `Huanhuan_0.0.2_aarch64.dmg` from
+Grab `Huanhuan_0.0.3_aarch64.dmg` from
 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases), open it and
 drag 缓缓 into Applications.
 
@@ -251,6 +251,14 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.3 (2026-10-11)
+
+Fixes for issues that only showed up in real testing of v0.0.2.
+
+- **The lock screen's snooze is no longer unlimited**: the snooze entitlement used to live in `lock.json`, but snoozing ends the whole lock session and deletes that file — so every round started from a full budget, "3 snoozes left" never changed, and it could be clicked forever. Snoozing is now **exactly once**, the same rule as the soft reminder: the lock that pops back after a snooze offers only "Finish break". The per-task "max snoozes" setting is gone with it — there is no count left to configure.
+- **One click on "Got it" closes the popup**: macOS WebViews ignore the first click on an inactive window (it only brings the window to the front), so it took two. The popup now accepts the first mouse click.
+- **Confirmed reminders no longer go silent**: "Got it" / "snooze" used to close the popup before reporting back to the backend — once the window was gone those calls were silently dropped, the task's `triggered` flag stuck at true, and that reminder **never fired again** (until a restart). The order is now: settle first, close the window last.
 
 ### v0.0.2 (2026-10-09)
 
