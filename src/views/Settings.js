@@ -7,7 +7,7 @@
 import { h } from '../ui/dom.js';
 import { icon, logoMark } from '../ui/icons.js';
 import { state } from '../core/store.js';
-import { S } from '../core/strings.js';
+import { S, LANGUAGES } from '../core/strings.js';
 
 export function renderSettings({ autostartBusy }) {
   const s = state.settings;
@@ -86,6 +86,7 @@ export function renderSettings({ autostartBusy }) {
     group(
       'image',
       S.groupLook,
+      row(S.language, null, languageSegmented(s.language)),
       row(
         S.bgImage,
         s.lockScreenBgImage ? shortPath(s.lockScreenBgImage) : S.bgImageDesc,
@@ -240,12 +241,30 @@ function mediaSegmented(current) {
   );
 }
 
+/** 语言分段控件。标签用它自己的语言写，所以两种界面下都长一样。 */
+function languageSegmented(current) {
+  return h(
+    'div',
+    { class: 'segmented' },
+    ...LANGUAGES.map(option =>
+      h(
+        'button',
+        {
+          dataset: { act: 'set-language', value: option.id },
+          'aria-pressed': String(current === option.id),
+        },
+        option.label
+      )
+    )
+  );
+}
+
 /** 步进器：和提醒页共用一套外观与同一套 data-act 约定 */
 function stepper({ act, value, min, max, unit }) {
   return h(
     'div',
     { class: 'stepper' },
-    h('button', { dataset: { act, delta: '-1' }, 'aria-label': '减少' }, '−'),
+    h('button', { dataset: { act, delta: '-1' }, 'aria-label': S.decrease }, '−'),
     h('input', {
       type: 'number',
       value: String(value),
@@ -253,7 +272,7 @@ function stepper({ act, value, min, max, unit }) {
       max: String(max),
       dataset: { act, delta: '0' },
     }),
-    h('button', { dataset: { act, delta: '1' }, 'aria-label': '增加' }, '+'),
+    h('button', { dataset: { act, delta: '1' }, 'aria-label': S.increase }, '+'),
     h('span', { class: 'unit' }, unit)
   );
 }

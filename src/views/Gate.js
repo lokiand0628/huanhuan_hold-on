@@ -40,7 +40,7 @@ export function renderGate(input) {
         autocomplete: 'off',
         autocorrect: 'off',
         autocapitalize: 'off',
-        placeholder: '在这里一个字一个字打出来',
+        placeholder: S.gatePlaceholder,
         value: input,
         dataset: { act: 'gate-input' },
         // 三层拦粘贴。前两层是体验（连"按了没反应"都不该发生），

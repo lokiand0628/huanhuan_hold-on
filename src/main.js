@@ -30,7 +30,7 @@ import { renderApp, renderToasts } from './views/App.js';
 import { renderReminder } from './views/Reminder.js';
 import { renderLock, tickLock } from './views/Lock.js';
 import { mount, delegate, assertHandlers } from './ui/dom.js';
-import { S, taskTitle, taskDesc } from './core/strings.js';
+import { S, setLanguage, languageTag, detectSystemLanguage, taskTitle, taskDesc } from './core/strings.js';
 
 const params = new URLSearchParams(location.search);
 const MODE = params.get('mode') || 'main';
@@ -52,6 +52,11 @@ document.body.dataset.route = MODE === 'reminder' ? 'reminder' : 'main';
 let toastSeq = 0;
 function toast(text, tone = 'neutral') {
   if (MODE !== 'main') return;
+  // 同一条文案已经挂着就不再叠一条。菜单事件会同时送到「托盘处理器」和
+  // 「应用菜单处理器」两边（Tauri 的托盘 on_menu_event 文档原话是
+  // "called for any menu event"，应用级那份是另一个列表），所以 Cmd+Q 或
+  // 托盘「退出」在锁定期间会各推一次 —— 用户会看到两条一模一样的提示条。
+  if (state.toasts.some(t => t.text === text)) return;
   const id = ++toastSeq;
   state.toasts = [...state.toasts, { id, text, tone }];
   renderToastsInto();
@@ -126,6 +131,7 @@ function applyRoute() {
 const actions = createActions({
   render,
   toast,
+  applyLanguage,
   backendTasks: toBackendTasks,
   autostart: {
     setBusy(value) {
@@ -255,22 +261,61 @@ async function startLockUI(task, options) {
 function wireTriggerDelivery() {
   api.listen('task-triggered', event => handleTrigger(event.payload));
 
+  // 强制休息期间按 Cmd+Q、或点托盘里的「退出/重启」：Rust 那边挡下来了，
+  // 并推一条 `exit-blocked`。这条事件此前**没有任何监听者** —— 挡是挡住了，
+  // 但用户看到的是"按了没反应"，会以为是自己没点中。
+  api.listen('exit-blocked', () => toast(S.exitBlockedLocked, 'warning'));
+
   // 兜底：事件在某些情况下会漏（窗口还没建好、webview 刚重载）。
-  // 每秒问一次待处理队列，代价只是一次本地 IPC。
+  // 2.5 秒问一次待处理队列，代价只是一次本地 IPC。原来这里是 1 秒 ——
+  // 触发一旦没被 ack 掉，配合 `enter_reminder` 就等于每秒把浮窗重新推到前台，
+  // 日志上能看到 WebKit 每秒重新抢一次前台断言。
   setInterval(async () => {
     const pending = await api.peekTriggered();
     for (const item of pending || []) await handleTrigger(item);
-  }, 1000);
+  }, 2500);
 }
 
 /* ============================== 启动 ============================== */
 
+/**
+ * 定语言，并让 Rust 侧跟着换（托盘菜单和应用菜单的文案在那边）。
+ *
+ * 界面文案全靠 `S` 这个活绑定现读，所以这里**必须在第一次 render 之前**跑完，
+ * 否则会先闪一屏另一种语言。菜单文案换不了不该拖累界面，所以不 await。
+ */
+function applyLanguage(lang) {
+  const picked = setLanguage(lang);
+  api.updateTrayLanguage(languageTag(picked)).catch(() => {});
+  return picked;
+}
+
+/** 浮窗 / 副屏那两条路由用：它们不跑 loadSettings，只读一眼文件里的语言。 */
+async function applyStoredLanguage() {
+  let stored = null;
+  try {
+    stored = JSON.parse((await api.loadSettings()) || '{}')?.language;
+  } catch {
+    // 文件坏了就按系统语言走；真正解析失败的那条路会在主窗口报出来。
+  }
+  applyLanguage(stored || detectSystemLanguage());
+}
+
 async function boot() {
-  if (MODE === 'reminder') return bootReminder();
-  if (IS_SLAVE) return bootSlave();
+  // 语言要先定，而且**三条路由各走一遍** —— 主窗、居中浮窗、副屏锁屏是三个独立
+  // 的 webview，各自的模块实例，谁也不共享谁的状态。
+  if (MODE === 'reminder') {
+    await applyStoredLanguage();
+    return bootReminder();
+  }
+  if (IS_SLAVE) {
+    await applyStoredLanguage();
+    return bootSlave();
+  }
 
   state.version = await api.version();
   await loadSettings();
+  applyLanguage(state.settings.language);
 
   // 冷启动恢复：Rust 在 setup() 里已经把 `lock_screen_active` 置好了
   // （必须早于计时线程开跑，否则任务会被建成"未冻结"而在锁屏背后触发），

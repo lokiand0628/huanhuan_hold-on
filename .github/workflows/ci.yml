@@ -50,6 +50,11 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      # 文案表的键对齐是「双语」唯一能自动验的部分：少一个键，中文界面毫无异常，
+      # 英文界面那块静默空白。顺带验 S 还是不是活绑定（断了界面就不会跟着切）。
+      - name: Check i18n tables
+        run: npm run check:i18n
+
       - name: Check Tauri backend
         working-directory: src-tauri
         run: cargo check

@@ -53,7 +53,9 @@ const TASK_STEPS = {
 const DURATION_AUTH_THRESHOLD = 10 * 60;
 
 export function createActions(ctx) {
-  const { render, toast, onGateInput, autostart, lock } = ctx;
+  // `applyLanguage` 由 main.js 注入：它要同时改界面文案（strings.js 的活绑定）
+  // 和 Rust 侧的托盘/应用菜单，放在 main 那一层才不会绕回去 import 入口模块。
+  const { render, toast, onGateInput, autostart, lock, applyLanguage } = ctx;
 
   /** 改完配置统一走这里：落盘 + 把新任务表推给后端 */
   async function commit({ resync = true } = {}) {
@@ -381,6 +383,20 @@ export function createActions(ctx) {
       render();
     },
 
+    /**
+     * 切语言。界面文案是 `S` 的活绑定，所以 `setLanguage` 之后必须整棵重绘一次；
+     * 托盘和应用菜单的文案在 Rust 侧，得另外通知它（`updateTrayLanguage`）。
+     * 顺序是**先切界面、再落盘**：落盘慢一点不影响观感，反过来会先卡一下再变。
+     */
+    async 'set-language'(el) {
+      const next = el.dataset.value === 'en' ? 'en' : 'zh';
+      if (state.settings.language === next) return;
+      state.settings.language = next;
+      applyLanguage(next);
+      render();
+      await commit({ resync: false });
+    },
+
     'idle-threshold'(el) {
       const current = Math.round(state.settings.idleThreshold / 60);
       const next = clampInt(current + Number(el.dataset.delta), 1, 60, current);
@@ -393,7 +409,7 @@ export function createActions(ctx) {
 
     async 'pick-sound'() {
       const path = await api.pickFile([
-        { name: '音频', extensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'] },
+        { name: S.filterAudio, extensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'] },
       ]);
       if (!path) return;
       state.settings.customSoundPath = path;
@@ -413,7 +429,7 @@ export function createActions(ctx) {
 
     async 'pick-image'() {
       const path = await api.pickFile([
-        { name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'] },
+        { name: S.filterImage, extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'] },
       ]);
       if (!path) return;
       state.settings.lockScreenBgImage = api.convertFileSrc(path);

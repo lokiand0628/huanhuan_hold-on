@@ -240,6 +240,16 @@ fn get_tray_text(key: &str, lang: &str) -> &'static str {
         ("task_water", _) => "喝水提醒",
         ("task_eye", "en-US") => "Eye Rest Reminder",
         ("task_eye", _) => "护眼提醒",
+        // 顶部菜单栏。Tauri 的默认菜单这几项是写死的英文（muda 给的标题），
+        // 所以自己建的那份必须跟着界面语言走 —— 见 build_app_menu。
+        ("menu_file", "en-US") => "File",
+        ("menu_file", _) => "文件",
+        ("menu_edit", "en-US") => "Edit",
+        ("menu_edit", _) => "编辑",
+        ("menu_window", "en-US") => "Window",
+        ("menu_window", _) => "窗口",
+        ("menu_quit", "en-US") => "Quit Hold On",
+        ("menu_quit", _) => "退出 缓缓",
         _ => "",
     }
 }
@@ -1768,15 +1778,481 @@ fn pause_playing_media_sessions_impl(mode: MediaPauseMode) -> Result<bool, Strin
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+/// macOS 侧的实现：只对**正在运行**的播放器发 AppleScript，并记住暂停了谁，
+/// 退出强制时再放回去。
+///
+/// 为什么不是 MediaRemote：那是私有框架，macOS 15 起对未签名 app 的
+/// `MRMediaRemoteSendCommand` 基本不生效，而且失败是静默的 —— 宁可少覆盖几个
+/// 播放器，也要能判定"到底暂停成功了没有"。
+///
+/// 先 `pgrep` 再 `osascript`：对方没跑就别去碰，否则第一次上锁会对着一堆
+/// 无关 app 弹"自动化"授权框。
+#[cfg(target_os = "macos")]
+mod media_pause_macos {
+    use super::MediaPauseMode;
+    use std::process::Command;
+    use std::sync::{Mutex, OnceLock};
+
+    struct Player {
+        /// `pgrep -x` 用的进程名，和 AppleScript 里的 app 名一致
+        process_name: &'static str,
+        /// 只有视频播放器才在 Video 模式下被算进来
+        is_video: bool,
+        pause_script: &'static str,
+        resume_script: &'static str,
+    }
+
+    /// 只认有脚本接口的那几个。浏览器里的视频（Safari / Chrome）没有可用的
+    /// 播放控制，**刻意不覆盖** —— 这里是能力边界，不是漏写。
+    const PLAYERS: &[Player] = &[
+        Player {
+            process_name: "Music",
+            is_video: false,
+            pause_script: r#"tell application "Music"
+	if player state is playing then
+		pause
+		return "paused"
+	end if
+end tell
+return "no""#,
+            resume_script: r#"tell application "Music"
+	if player state is paused then
+		play
+		return "resumed"
+	end if
+end tell
+return "no""#,
+        },
+        Player {
+            process_name: "Spotify",
+            is_video: false,
+            pause_script: r#"tell application "Spotify"
+	if player state is playing then
+		pause
+		return "paused"
+	end if
+end tell
+return "no""#,
+            resume_script: r#"tell application "Spotify"
+	if player state is paused then
+		play
+		return "resumed"
+	end if
+end tell
+return "no""#,
+        },
+        Player {
+            process_name: "IINA",
+            is_video: true,
+            pause_script: r#"tell application "IINA"
+	pause
+	return "paused"
+end tell"#,
+            resume_script: r#"tell application "IINA"
+	play
+	return "resumed"
+end tell"#,
+        },
+        Player {
+            process_name: "QuickTime Player",
+            is_video: true,
+            pause_script: r#"tell application "QuickTime Player"
+	if (count of documents) > 0 then
+		if playing of document 1 then
+			pause document 1
+			return "paused"
+		end if
+	end if
+end tell
+return "no""#,
+            resume_script: r#"tell application "QuickTime Player"
+	if (count of documents) > 0 then
+		if not playing of document 1 then
+			play document 1
+			return "resumed"
+		end if
+	end if
+end tell
+return "no""#,
+        },
+    ];
+
+    /// 「我们暂停了谁」。只恢复这里记下的，绝不碰用户自己按了暂停的播放器。
+    static PAUSED: OnceLock<Mutex<Vec<&'static str>>> = OnceLock::new();
+
+    fn paused() -> &'static Mutex<Vec<&'static str>> {
+        PAUSED.get_or_init(|| Mutex::new(Vec::new()))
+    }
+
+    fn is_running(process_name: &str) -> bool {
+        Command::new("/usr/bin/pgrep")
+            .arg("-x")
+            .arg(process_name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+
+    /// 跑一段脚本，返回脚本自己吐的那句结果（"paused" / "resumed" / "no"）。
+    fn run_script(script: &str) -> Result<String, String> {
+        let output = Command::new("/usr/bin/osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|e| format!("osascript 起不来: {e}"))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(if stderr.is_empty() {
+                "osascript 返回非 0".to_string()
+            } else {
+                stderr
+            });
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    pub fn pause(mode: MediaPauseMode) -> Result<bool, String> {
+        if mode == MediaPauseMode::None {
+            return Ok(false);
+        }
+
+        let mut paused_now: Vec<&'static str> = Vec::new();
+        let mut errors: Vec<String> = Vec::new();
+
+        for player in PLAYERS {
+            if mode == MediaPauseMode::Video && !player.is_video {
+                continue;
+            }
+            if !is_running(player.process_name) {
+                continue;
+            }
+            match run_script(player.pause_script) {
+                Ok(result) if result == "paused" => paused_now.push(player.process_name),
+                Ok(_) => {}
+                Err(err) => errors.push(format!("{}: {err}", player.process_name)),
+            }
+        }
+
+        let any_paused = !paused_now.is_empty();
+        if any_paused {
+            let mut registry = paused().lock().unwrap();
+            for name in paused_now {
+                if !registry.contains(&name) {
+                    registry.push(name);
+                }
+            }
+        }
+
+        // 一个都没暂停成功、还真出了错，才把错误抛上去；否则"没在放"是正常结果。
+        if !any_paused && !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
+        Ok(any_paused)
+    }
+
+    pub fn resume() -> Result<bool, String> {
+        let names: Vec<&'static str> = {
+            let mut registry = paused().lock().unwrap();
+            std::mem::take(&mut *registry)
+        };
+
+        let mut resumed_any = false;
+        let mut errors: Vec<String> = Vec::new();
+
+        for name in names {
+            let Some(player) = PLAYERS.iter().find(|p| p.process_name == name) else {
+                continue;
+            };
+            // 期间被用户自己退掉的播放器就别去复活了
+            if !is_running(name) {
+                continue;
+            }
+            match run_script(player.resume_script) {
+                Ok(result) if result == "resumed" => resumed_any = true,
+                Ok(_) => {}
+                Err(err) => errors.push(format!("{name}: {err}")),
+            }
+        }
+
+        if !resumed_any && !errors.is_empty() {
+            return Err(errors.join("; "));
+        }
+        Ok(resumed_any)
+    }
+}
+
+/// 全局那一路。
+///
+/// Apple 的「现在播放」确实是系统级的：`mediaremoted` 守护进程 + 私有
+/// `MediaRemote.framework`，控制中心那个播放小组件就是它的界面。公开的
+/// `MediaPlayer.framework`（MPNowPlayingInfoCenter）只能发布**自己 App** 的
+/// 播放信息，不是控制别人的通道 —— 所以「全局」只有这一条路。
+///
+/// 但它在 macOS 27 上对第三方是**读写不对等**的（本机 macOS 27.2 实测）：
+///
+///   - **读**（`MRMediaRemoteGetNowPlayingInfo`、PlaybackQueue 请求）需要私有
+///     entitlement。我们 `entitlements=0`，`mediaremoted` 直接回
+///     `kMRMediaRemoteFrameworkErrorDomain Code=3 "Operation not permitted"`，
+///     而且是**静默**的：回调照来、内容永远为空。所以它**不能**用来判断
+///     「有没有在播」。
+///   - **写**（`MRMediaRemoteSendCommand`）不要 entitlement。实测能把 QuickTime
+///     真的暂停、真的继续，`mediaremoted` 日志里有 `Sending command ... command = Pause`。
+///
+/// 于是分工是：**公开的 CoreAudio 判断有没有在播，MediaRemote 只负责广播**。
+/// `kAudioProcessPropertyIsRunningOutput` 是公开 API，连静音播放（静音视频、
+/// 静音音频）都算「正在输出」，正好是我们要的信号 —— 我们不需要知道在放什么，
+/// 只需要知道"有没有声音在走"。
+#[cfg(target_os = "macos")]
+mod media_global_macos {
+    use std::ffi::{c_void, CString};
+    use std::os::raw::c_char;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    type AudioObjectId = u32;
+    type OsStatus = i32;
+
+    /// `kAudioObjectSystemObject`，头文件里就是 1
+    const SYSTEM_OBJECT: AudioObjectId = 1;
+    /// `kAudioObjectPropertyScopeGlobal` = 'glob'
+    const SCOPE_GLOBAL: u32 = 0x676c_6f62;
+    /// `kAudioObjectPropertyElementMain` = 0
+    const ELEMENT_MAIN: u32 = 0;
+    /// 下面两个 FourCC 照抄 SDK 的 AudioHardware.h（MacOSX27.0.sdk:633 / 1978）
+    const PROCESS_OBJECT_LIST: u32 = 0x7072_7323; // 'prs#'
+    const PROCESS_IS_RUNNING_OUTPUT: u32 = 0x7069_726f; // 'piro'
+
+    #[repr(C)]
+    struct PropertyAddress {
+        selector: u32,
+        scope: u32,
+        element: u32,
+    }
+
+    #[link(name = "CoreAudio", kind = "framework")]
+    extern "C" {
+        fn AudioObjectGetPropertyDataSize(
+            object: AudioObjectId,
+            address: *const PropertyAddress,
+            qualifier_size: u32,
+            qualifier: *const c_void,
+            out_size: *mut u32,
+        ) -> OsStatus;
+        fn AudioObjectGetPropertyData(
+            object: AudioObjectId,
+            address: *const PropertyAddress,
+            qualifier_size: u32,
+            qualifier: *const c_void,
+            io_size: *mut u32,
+            out_data: *mut c_void,
+        ) -> OsStatus;
+    }
+
+    extern "C" {
+        fn dlopen(path: *const c_char, mode: i32) -> *mut c_void;
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+    }
+
+    const RTLD_NOW: i32 = 2;
+    const MEDIAREMOTE_PATH: &str =
+        "/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote";
+    const COMMAND_PLAY: i32 = 0;
+    const COMMAND_PAUSE: i32 = 1;
+
+    /// `Boolean MRMediaRemoteSendCommand(int command, CFTypeRef userInfo)`，
+    /// 传 NULL 就是「不带附加信息」。
+    type SendCommand = unsafe extern "C" fn(i32, *const c_void) -> bool;
+
+    fn address(selector: u32) -> PropertyAddress {
+        PropertyAddress {
+            selector,
+            scope: SCOPE_GLOBAL,
+            element: ELEMENT_MAIN,
+        }
+    }
+
+    /// 现在有进程在往音频设备输出吗？
+    pub fn output_running() -> Result<bool, String> {
+        let list = address(PROCESS_OBJECT_LIST);
+        let mut size: u32 = 0;
+        let status = unsafe {
+            AudioObjectGetPropertyDataSize(SYSTEM_OBJECT, &list, 0, std::ptr::null(), &mut size)
+        };
+        if status != 0 {
+            return Err(format!("CoreAudio 取进程列表长度失败: {status}"));
+        }
+
+        let count = (size as usize) / std::mem::size_of::<AudioObjectId>();
+        if count == 0 {
+            return Ok(false);
+        }
+
+        let mut objects = vec![0 as AudioObjectId; count];
+        let mut io_size = size;
+        let status = unsafe {
+            AudioObjectGetPropertyData(
+                SYSTEM_OBJECT,
+                &list,
+                0,
+                std::ptr::null(),
+                &mut io_size,
+                objects.as_mut_ptr() as *mut c_void,
+            )
+        };
+        if status != 0 {
+            return Err(format!("CoreAudio 读进程列表失败: {status}"));
+        }
+
+        for object in objects {
+            let running_address = address(PROCESS_IS_RUNNING_OUTPUT);
+            let mut running: u32 = 0;
+            let mut running_size = std::mem::size_of::<u32>() as u32;
+            let status = unsafe {
+                AudioObjectGetPropertyData(
+                    object,
+                    &running_address,
+                    0,
+                    std::ptr::null(),
+                    &mut running_size,
+                    &mut running as *mut u32 as *mut c_void,
+                )
+            };
+            if status == 0 && running != 0 {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn send_command(command: i32) -> Result<bool, String> {
+        let path = CString::new(MEDIAREMOTE_PATH).map_err(|e| e.to_string())?;
+        let handle = unsafe { dlopen(path.as_ptr(), RTLD_NOW) };
+        if handle.is_null() {
+            return Err("MediaRemote 打不开（系统可能改了路径）".to_string());
+        }
+
+        let symbol = CString::new("MRMediaRemoteSendCommand").map_err(|e| e.to_string())?;
+        let raw = unsafe { dlsym(handle, symbol.as_ptr()) };
+        if raw.is_null() {
+            return Err("MRMediaRemoteSendCommand 不存在".to_string());
+        }
+
+        let send: SendCommand = unsafe { std::mem::transmute(raw) };
+        // 返回值只表示「命令已交给 mediaremoted」，不表示送达。所以下面两个
+        // 函数都靠 CoreAudio 再判一次，不把返回值当结果。
+        Ok(unsafe { send(command, std::ptr::null()) })
+    }
+
+    /// 我们广播暂停过没有 —— 只恢复自己暂停的，绝不凭空开始播放。
+    static BROADCAST_PAUSED: AtomicBool = AtomicBool::new(false);
+
+    /// 先确认「确实有东西在放」再发暂停：没在放就没有 now-playing 客户端，
+    /// 发了也是空转，还会平白多一条 mediaremoted 日志。
+    pub fn broadcast_pause() -> Result<bool, String> {
+        if !output_running()? {
+            return Ok(false);
+        }
+        let sent = send_command(COMMAND_PAUSE)?;
+        if sent {
+            BROADCAST_PAUSED.store(true, Ordering::SeqCst);
+        }
+        Ok(sent)
+    }
+
+    /// 恢复的两道护栏：
+    ///   1. 没广播暂停过就不发 —— 「凭空开始播放」是这套 API 最危险的失败模式。
+    ///   2. 退出时要是又有东西在输出了，说明用户自己放了新的，那就别发，别打断他。
+    pub fn broadcast_resume() -> Result<bool, String> {
+        if !BROADCAST_PAUSED.swap(false, Ordering::SeqCst) {
+            return Ok(false);
+        }
+        if output_running()? {
+            return Ok(false);
+        }
+        send_command(COMMAND_PLAY)
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn pause_playing_media_sessions_impl(mode: MediaPauseMode) -> Result<bool, String> {
+    // 精确路径：有脚本接口的那几个播放器。它能知道「本来就 <在播>」，
+    // 所以退出时可以只恢复**我们暂停过的**，用户自己按的暂停绝不碰。
+    let scripted = match media_pause_macos::pause(mode) {
+        Ok(paused) => paused,
+        Err(err) => {
+            eprintln!("[media] AppleScript 暂停失败: {err}");
+            false
+        }
+    };
+
+    // 全局路径：只给 All 用。Video 模式走不了 —— 读取被系统拒掉，我们分不出
+    // 正在放的是音频还是视频，硬广播会把背景音乐一起按掉。
+    let broadcasted = if mode == MediaPauseMode::All {
+        match media_global_macos::broadcast_pause() {
+            Ok(paused) => paused,
+            Err(err) => {
+                eprintln!("[media] 全局暂停失败: {err}");
+                false
+            }
+        }
+    } else {
+        false
+    };
+
+    Ok(scripted || broadcasted)
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn pause_playing_media_sessions_impl(_mode: MediaPauseMode) -> Result<bool, String> {
     Ok(false)
 }
 
+/// 异步 + `spawn_blocking`：一次可能要连开好几个 `osascript`，几百毫秒，
+/// 不能占着 IPC 线程（它会卡住整个 webview 的其它 invoke）。
 #[tauri::command]
-fn pause_playing_media_sessions(mode: Option<String>) -> Result<bool, String> {
+async fn pause_playing_media_sessions(mode: Option<String>) -> Result<bool, String> {
     let mode = parse_media_pause_mode(mode.as_deref());
-    pause_playing_media_sessions_impl(mode)
+    tauri::async_runtime::spawn_blocking(move || pause_playing_media_sessions_impl(mode))
+        .await
+        .map_err(|e| format!("暂停媒体任务异常: {e}"))?
+}
+
+#[tauri::command]
+async fn resume_playing_media_sessions() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(resume_playing_media_sessions_impl)
+        .await
+        .map_err(|e| format!("恢复媒体任务异常: {e}"))?
+}
+
+#[cfg(target_os = "macos")]
+fn resume_playing_media_sessions_impl() -> Result<bool, String> {
+    // 顺序有讲究：广播恢复要先判断「现在还是不是安静的」。要是先恢复了脚本记录的
+    // 那几个，输出就又有声了，这条判断会被我们自己的动作干扰。
+    let broadcasted = match media_global_macos::broadcast_resume() {
+        Ok(resumed) => resumed,
+        Err(err) => {
+            eprintln!("[media] 全局恢复失败: {err}");
+            false
+        }
+    };
+
+    let scripted = match media_pause_macos::resume() {
+        Ok(resumed) => resumed,
+        Err(err) => {
+            eprintln!("[media] AppleScript 恢复失败: {err}");
+            false
+        }
+    };
+
+    Ok(broadcasted || scripted)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn resume_playing_media_sessions_impl() -> Result<bool, String> {
+    Ok(false)
 }
 
 #[tauri::command]
@@ -2550,13 +3026,35 @@ struct ReminderState(Mutex<Option<serde_json::Value>>);
 
 #[tauri::command]
 fn enter_reminder(app: AppHandle, payload: serde_json::Value) -> Result<(), String> {
+    let incoming_id = payload
+        .get("id")
+        .and_then(|value| value.as_str())
+        .map(str::to_string);
+
+    let state = app.state::<ReminderState>();
+    let showing_id = state
+        .0
+        .lock()
+        .unwrap()
+        .as_ref()
+        .and_then(|current| current.get("id"))
+        .and_then(|value| value.as_str())
+        .map(str::to_string);
+
     // 先落 payload 再建窗口：窗口 boot 之后调 get_reminder_payload 读它，
     // 所以不存在"窗口已加载但内容还没到"的竞态。
-    *app.state::<ReminderState>().0.lock().unwrap() = Some(payload);
+    *state.0.lock().unwrap() = Some(payload);
+    drop(state);
 
     if let Some(window) = app.get_webview_window("reminder") {
         let _ = window.show();
-        let _ = window.set_focus();
+        // **同一条提醒**就别再 set_focus 了。前端有一颗 1 秒的兜底轮询，
+        // 事件和轮询会送到同一条触发；这里原来每次都 show+set_focus，
+        // 于是窗口被反复推到前台、WebKit 每秒重新抢一次前台断言。
+        // 换一条提醒（id 变了）才需要把焦点拿过来。
+        if showing_id != incoming_id {
+            let _ = window.set_focus();
+        }
         return Ok(());
     }
 
@@ -2781,6 +3279,20 @@ fn update_tray_language(app: AppHandle, lang_state: State<LanguageState>, langua
     // 重新构建托盘菜单以应用新语言
     rebuild_tray_menu(&app);
 
+    // 顶部菜单栏是**另一份 Menu**（托盘那份管不到它），也得跟着换。
+    // 这一段失败只影响菜单文案，不该让整条命令报错。
+    #[cfg(target_os = "macos")]
+    {
+        match build_app_menu(&app) {
+            Ok(menu) => {
+                if let Err(err) = app.set_menu(menu) {
+                    eprintln!("[i18n] 重建应用菜单失败: {err}");
+                }
+            }
+            Err(err) => eprintln!("[i18n] 构建应用菜单失败: {err}"),
+        }
+    }
+
     // 更新托盘提示文本
     let tray_state = app.state::<TrayState>();
     let guard = tray_state.0.lock().unwrap();
@@ -2971,6 +3483,13 @@ fn exit_lock_mode(app: tauri::AppHandle, state: State<LockState>, restore_visibl
     let restore_visible = restore_visible.unwrap_or(false);
     let window = app.get_webview_window("main");
 
+    // 退出强制就把**我们暂停过的**媒体放回去。挂后台线程：这里跑在主线程上，
+    // 而一次恢复要连开好几个 osascript，几百毫秒足够把全屏 Space 切换卡一下。
+    // 注册表为空时这是纯 no-op，所以挂在最常见的退出路径上很便宜。
+    std::thread::spawn(|| {
+        let _ = resume_playing_media_sessions_impl();
+    });
+
     if let Some(window) = window {
         if !restore_visible {
             let _ = window.hide();
@@ -3003,6 +3522,260 @@ fn exit_lock_mode(app: tauri::AppHandle, state: State<LockState>, restore_visibl
     // 落盘状态必须一起清掉，否则下次启动会把一个已经结束的锁恢复出来。
     // `kill -9` 和断电不会经过这里 —— 那正是 `lock.json` 存在的意义。
     let _ = fs::remove_file(get_lock_state_path());
+}
+
+/// macOS 顶部菜单栏。
+///
+/// **必须自己建一份，不能用 Tauri 的默认菜单。** Tauri 在 `menu` 没设置时会自动
+/// 装一份默认菜单（tauri/src/app.rs:2410），里面那个 Quit 是
+/// `PredefinedMenuItem::quit` —— 而 muda 在 macOS 上把它**直接接到**
+/// `-[NSApplication terminate:]`（muda/platform_impl/macos/mod.rs:911）。
+///
+/// 也就是说 Cmd+Q 根本不经过 Tauri 的 `RunEvent::ExitRequested`：
+/// tauri-runtime-wry 只在「最后一个窗口被销毁」和 `app.exit()/restart()`
+/// 这两条路上发这个事件，而 tao 的 delegate 里也**没有**
+/// `applicationShouldTerminate:` —— 全程没有任何环节能否决 `terminate:`。
+/// 所以 `if is_lock_active { api.prevent_exit() }` 对 Cmd+Q 是无效的，
+/// 强制休息期间一个反射性 Cmd+Q 就能把进程杀掉。
+///
+/// 换成一个**自定义** `MenuItem`（id = `quit`）之后，Cmd+Q 会走我们自己的
+/// `on_menu_event`，和托盘菜单那个「退出」共用同一套 `is_lock_active` 闸门。
+///
+/// 其余各项照抄 Tauri 的默认菜单 —— 尤其是 Edit：少了 `copy:` / `paste:`
+/// 这些标准 selector，输入框里的 Cmd+C / Cmd+V / Cmd+A 会一起失效。
+#[cfg(target_os = "macos")]
+fn build_app_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    use tauri::menu::{AboutMetadata, PredefinedMenuItem};
+
+    // 语言从 LanguageState 取。用 `try_state`：这个函数在 Builder 构建期也会被调到，
+    // 万一那时 manage 还没走到这里，取不到就按中文兜底 —— 菜单文案不对，
+    // 远好过整个启动 panic。
+    let lang = app
+        .try_state::<LanguageState>()
+        .map(|state| state.0.lock().unwrap().clone())
+        .unwrap_or_else(|| "zh-CN".to_string());
+
+    let pkg_info = app.package_info();
+    let about_metadata = AboutMetadata {
+        name: Some(pkg_info.name.clone()),
+        version: Some(pkg_info.version.to_string()),
+        ..Default::default()
+    };
+
+    // 子菜单标题自己写，不用 Tauri 默认菜单那份：默认菜单的标题是 muda 写死的
+    // 英文（File / Edit / Window），中文界面下会很突兀。各项内容照旧 ——
+    // 尤其是 Edit：少了 `copy:` / `paste:` 这些标准 selector，
+    // 输入框里的 Cmd+C / Cmd+V / Cmd+A 会一起失效。
+    let app_submenu = Submenu::with_items(
+        app,
+        pkg_info.name.clone(),
+        true,
+        &[
+            &PredefinedMenuItem::about(app, None, Some(about_metadata))?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::services(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide_others(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &quit_menu_item(app, &lang)?,
+        ],
+    )?;
+
+    let file_submenu = Submenu::with_items(
+        app,
+        get_tray_text("menu_file", &lang),
+        true,
+        &[&PredefinedMenuItem::close_window(app, None)?],
+    )?;
+
+    let edit_submenu = Submenu::with_items(
+        app,
+        get_tray_text("menu_edit", &lang),
+        true,
+        &[
+            &PredefinedMenuItem::undo(app, None)?,
+            &PredefinedMenuItem::redo(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::cut(app, None)?,
+            &PredefinedMenuItem::copy(app, None)?,
+            &PredefinedMenuItem::paste(app, None)?,
+            &PredefinedMenuItem::select_all(app, None)?,
+        ],
+    )?;
+
+    let window_submenu = Submenu::with_items(
+        app,
+        get_tray_text("menu_window", &lang),
+        true,
+        &[
+            &PredefinedMenuItem::minimize(app, None)?,
+            &PredefinedMenuItem::maximize(app, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &PredefinedMenuItem::close_window(app, None)?,
+        ],
+    )?;
+
+    Menu::with_items(
+        app,
+        &[&app_submenu, &file_submenu, &edit_submenu, &window_submenu],
+    )
+}
+
+/// 自定义的「退出」项。**刻意不用 `PredefinedMenuItem::quit`** —— 理由见
+/// `build_app_menu`。id 和托盘菜单里那个 `quit` 保持一致，处理逻辑共用一套。
+#[cfg(target_os = "macos")]
+fn quit_menu_item(app: &AppHandle, lang: &str) -> tauri::Result<MenuItem<tauri::Wry>> {
+    MenuItem::with_id(app, "quit", get_tray_text("menu_quit", lang), true, Some("CmdOrCtrl+Q"))
+}
+
+/// 非 macOS 保持 Tauri 的默认菜单（这一版只发 macOS，别的平台不折腾）。
+#[cfg(not(target_os = "macos"))]
+fn build_app_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    Menu::default(app)
+}
+
+/// 兜住**系统层面**的退出请求：Dock 右键「退出」、Quit Apple Event，
+/// 以及 `NSApp terminate:`。
+///
+/// 为什么非做不可：Cmd+Q 我们靠自定义菜单项挡掉了，但
+/// 「右键 Dock 图标 → 退出」根本不经过菜单 —— 它走 Quit Apple Event →
+/// AppKit 的 `applicationShouldTerminate:`。而 tao 的 delegate 里**没有实现
+/// 这个方法**（`tao/src/platform_impl/macos/app_delegate.rs` 只加了
+/// `applicationWillTerminate:`），默认放行。于是它是一条和 Cmd+Q 同档的
+/// 反射性出口（两次点击），必须一起堵。
+///
+/// 做法是在运行时给 tao 那个 delegate 类挂上 `applicationShouldTerminate:`。
+/// 用 `class_addMethod` 而不是替换 `terminate:`：这是 AppKit 官方留的钩子，
+/// 一个钩子把上面三条路全覆盖，也不用去猜系统方法的实现细节。
+///
+/// **注销 / 关机 / 重启放行**：它们同样是 kAEQuitApplication，但带
+/// `kAEQuitReason`（'why?'）属性，取值见 SDK 的 AERegistry.h ——
+/// 'logo' / 'rlgo' / 'shut' / 'rest'。这几种属于「故意把整机收掉」，
+/// 而且重新登录后 `lock.json` 会让强制继续，本来也逃不掉，所以不拦。
+///
+/// 拦不住的照样拦不住：`Cmd+Opt+Esc` 强制退出、`kill -9`、活动监视器。
+#[cfg(target_os = "macos")]
+mod terminate_guard {
+    use super::{is_lock_active, AppHandle, Emitter};
+    use objc2::runtime::{AnyObject, Sel};
+    use objc2::{msg_send, sel};
+    use std::ffi::{c_char, c_void};
+    use std::sync::OnceLock;
+
+    /// 回调里拿不到 `AppHandle`，只能在 setup 时存一份。
+    static APP: OnceLock<AppHandle> = OnceLock::new();
+
+    /// `NSTerminateCancel = 0`、`NSTerminateNow = 1` —— 照抄 NSApplication.h:390。
+    /// 这两个值**极易记反**，记反的后果是「锁着时随便退、解锁后反而退不掉」。
+    const TERMINATE_CANCEL: usize = 0;
+    const TERMINATE_NOW: usize = 1;
+
+    /// `kAEQuitReason` = 'why?'（AERegistry.h:602）
+    const AE_QUIT_REASON: u32 = 0x7768_793f;
+
+    extern "C" {
+        fn objc_getClass(name: *const c_char) -> *mut AnyObject;
+        fn class_getName(class: *mut AnyObject) -> *const c_char;
+        fn class_addMethod(
+            class: *mut AnyObject,
+            name: Sel,
+            imp: *const c_void,
+            types: *const c_char,
+        ) -> u8;
+    }
+
+    /// 这次退出是不是系统在注销 / 关机 / 重启？
+    fn system_is_quitting() -> bool {
+        unsafe {
+            let manager_class = objc_getClass(c"NSAppleEventManager".as_ptr());
+            if manager_class.is_null() {
+                return false;
+            }
+            let manager: *mut AnyObject = msg_send![&mut *manager_class, sharedAppleEventManager];
+            if manager.is_null() {
+                return false;
+            }
+            // 不是 Apple Event 发起的退出（例如 Cmd+Q 走菜单）这里是 nil，
+            // 于是返回 false —— 正是我们要的「按 App 级退出处理」。
+            let event: *mut AnyObject = msg_send![&mut *manager, currentAppleEvent];
+            if event.is_null() {
+                return false;
+            }
+            let reason: *mut AnyObject =
+                msg_send![&mut *event, attributeDescriptorForKeyword: AE_QUIT_REASON];
+            if reason.is_null() {
+                return false;
+            }
+            let code: u32 = msg_send![&mut *reason, typeCode];
+            matches!(&code.to_be_bytes(), b"logo" | b"rlgo" | b"shut" | b"rest")
+        }
+    }
+
+    /// 签名对应
+    /// `- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender`，
+    /// 编码 `Q@:@`（Q = NSUInteger，@ = 对象，: = SEL）。
+    extern "C" fn application_should_terminate(
+        _this: *mut AnyObject,
+        _cmd: Sel,
+        _sender: *mut AnyObject,
+    ) -> usize {
+        if system_is_quitting() {
+            return TERMINATE_NOW;
+        }
+
+        match APP.get() {
+            Some(app) if is_lock_active(app) => {
+                // 和菜单/托盘那两条路一样给个回执。少了它，用户右键 Dock 退出、
+                // 结果什么都没发生时，只会以为是自己没点中。
+                let _ = app.emit("exit-blocked", ());
+                TERMINATE_CANCEL
+            }
+            _ => TERMINATE_NOW,
+        }
+    }
+
+    pub fn install(app: &AppHandle) {
+        let _ = APP.set(app.clone());
+
+        unsafe {
+            let app_class = objc_getClass(c"NSApplication".as_ptr());
+            if app_class.is_null() {
+                eprintln!("[terminate] 取不到 NSApplication");
+                return;
+            }
+            let shared: *mut AnyObject = msg_send![&mut *app_class, sharedApplication];
+            if shared.is_null() {
+                eprintln!("[terminate] NSApp 还是 nil");
+                return;
+            }
+            let delegate: *mut AnyObject = msg_send![&mut *shared, delegate];
+            if delegate.is_null() {
+                // 理论上不该发生：tao 在建事件循环时就把 delegate 设好了。
+                // 真发生了也只是少一层保护，菜单那层还在。
+                eprintln!("[terminate] delegate 是 nil，这一层没挂上");
+                return;
+            }
+            let delegate_class: *mut AnyObject = msg_send![&mut *delegate, class];
+            let class_name = std::ffi::CStr::from_ptr(class_getName(delegate_class))
+                .to_string_lossy()
+                .into_owned();
+
+            // 返回 0 只可能是「已经有同名方法」，不是错误。
+            let added = class_addMethod(
+                delegate_class,
+                sel!(applicationShouldTerminate:),
+                application_should_terminate as *const () as *const c_void,
+                c"Q@:@".as_ptr(),
+            );
+            // 成功/失败都留一句，方便从系统日志里核对这层到底挂上没有。
+            if added == 0 {
+                eprintln!("[terminate] {class_name} 上已有 applicationShouldTerminate:，沿用系统的");
+            } else {
+                eprintln!("[terminate] 已在 {class_name} 上挂好 applicationShouldTerminate:");
+            }
+        }
+    }
 }
 
 pub fn run() {
@@ -3069,6 +3842,7 @@ pub fn run() {
             exit_reminder,
             get_reminder_payload,
             pause_playing_media_sessions,
+            resume_playing_media_sessions,
             sync_tasks,
             timer_pause,
             timer_resume,
@@ -3099,7 +3873,26 @@ pub fn run() {
         .manage(ReminderState(Mutex::new(None)))
         .manage(PauseMenuState(Mutex::new(None)))
         .manage(LanguageState(Mutex::new("zh-CN".to_string())))
+        // 顶部菜单栏自己建一份（默认菜单的 Quit 拦不住 Cmd+Q，理由见 build_app_menu）
+        .menu(build_app_menu)
+        .on_menu_event(|app, event| {
+            // 应用菜单里的「退出」= Cmd+Q。和托盘菜单那个 quit 共用同一套闸门：
+            // 锁着就只推一条 `exit-blocked` 给前端（否则用户看到的是"按了没反应"），
+            // 不锁才真的退。
+            if event.id.as_ref() == "quit" {
+                if is_lock_active(app) {
+                    let _ = app.emit("exit-blocked", ());
+                } else {
+                    app.exit(0);
+                }
+            }
+        })
         .setup(|app| {
+            // 挂系统级退出钩子：Dock 右键退出 / Quit Apple Event。
+            // 必须在这里（而不是更早）：tao 的 delegate 是事件循环建立时才设好的。
+            #[cfg(target_os = "macos")]
+            terminate_guard::install(app.handle());
+
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let show = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
             let reset = MenuItem::with_id(app, "reset", "重置所有任务", true, None::<&str>)?;

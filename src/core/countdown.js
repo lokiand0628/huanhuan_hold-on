@@ -3,7 +3,7 @@
  */
 import { api } from './api.js';
 import { state, isDaily } from './store.js';
-import { taskTitle } from './strings.js';
+import { S, taskTitle } from './strings.js';
 
 const pad = n => String(n).padStart(2, '0');
 
@@ -19,8 +19,8 @@ export function fmt(seconds) {
 
 /** 排期的一句话描述：「每 45 分钟」/「每天 22:00、08:30」 */
 export function describeSchedule(task) {
-  if (isDaily(task)) return task.dailyTimes.join('、');
-  return `每 ${task.interval} 分钟`;
+  if (isDaily(task)) return task.dailyTimes.join(S.listSeparator);
+  return S.everyNMinutes(task.interval);
 }
 
 export function initCountdowns(list) {
@@ -36,7 +36,7 @@ function apply(info) {
 /** 托盘 tooltip 那份倒计时（主窗口之外唯一还显示剩余时间的地方） */
 function trayTip() {
   const best = bestRemaining();
-  if (!best) return '健康提醒';
+  if (!best) return S.healthReminder;
   return `${taskTitle(best.task)} ${fmt(best.left)}`;
 }
 

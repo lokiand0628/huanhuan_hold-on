@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.4-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.5-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -40,6 +40,9 @@ strength:
   so the minutes you spend rebooting still count.
 
 It doesn't notify you. It makes you stand up.
+
+The whole interface ships in **Chinese and English** — switch it in Settings, and the
+first launch follows your system language.
 
 > **Platform**: macOS only, and Apple Silicon (M-series) only. There are no Windows,
 > Linux or Intel Mac builds.
@@ -251,6 +254,39 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.5 (2026-10-19)
+
+Bilingual UI, plus a batch of issues that only hands-on testing exposes.
+
+- **Chinese / English UI.** Switch it under Settings → Appearance & language; the
+  choice is remembered. The first launch follows your system language. The tray menu,
+  the app menu bar, built-in task names, icon accessibility labels and file-dialog
+  type names are all translated too.
+- **Pausing media during a break now actually works on macOS.** It used to be a stub
+  (`Ok(false)`) and the frontend never called it — the setting was pure decoration.
+  Now there are two layers: players with a scripting interface (Music / Spotify /
+  IINA / QuickTime) are paused precisely and **only those we paused are resumed**;
+  everything else (video in a browser, for instance) is covered by a system-wide
+  broadcast. Whether anything is playing — and whether it is safe to resume — is
+  decided through the public CoreAudio API, so no private entitlements are involved.
+  - The first forced break asks once for Automation permission (needed to control
+    those players). Browser video goes through the broadcast and needs no permission.
+- **Four ways out of a forced break, all closed**: Cmd+Q (custom menu item), the tray
+  Quit / Restart items, and **right-clicking the Dock icon → Quit** (a Quit Apple
+  Event). The first two now show a toast instead of silently doing nothing.
+  - Log out / shut down / restart are **deliberately allowed** — that is a conscious
+    "take the whole machine down" action, and `lock.json` puts you back in the break
+    after you log in again.
+  - `kill -9`, `Cmd+Opt+Esc` and Activity Monitor cannot be blocked and are not meant
+    to be.
+- **The main window is draggable again.** The strip at the top used
+  `-webkit-app-region: drag`, a Chromium-only property that WKWebView does not
+  implement at all (`CSS.supports` returns false), so it had never worked. It now uses
+  Tauri's `data-tauri-drag-region`.
+- **The centered popup is no longer pushed to the front over and over**: a repeated
+  delivery of the same reminder only calls `show()`, and the fallback poll went from
+  1s to 2.5s.
 
 ### v0.0.4 (2026-10-11)
 

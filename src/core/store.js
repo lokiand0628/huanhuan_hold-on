@@ -6,7 +6,7 @@
  * 硬约束（旧版栽过的地方）：**UI 状态也要进 store**。旧版"哪张卡展开着"
  * 只存在 DOM 的 data-open 上，于是任何一个动作触发重绘，展开的卡片就塌掉。
  */
-import { BUILTIN, BUILTIN_IDS, taskTitle as titleOf } from './strings.js';
+import { BUILTIN_IDS, builtinTasks, detectSystemLanguage, taskTitle as titleOf } from './strings.js';
 import { normalizeIconName } from '../ui/icons.js';
 
 // icon 显式写出来，不再靠"id 恰好等于图标名"这个巧合 —— 内置任务的 id 是
@@ -43,6 +43,9 @@ const DEFAULTS = {
   customSoundPath: '',
   autoStart: false,
   silentAutoStart: true,
+  // 界面语言：zh / en。**默认跟着系统走**，用户改过之后就以文件里的为准
+  // ——detectSystemLanguage 只在没有这个键时兜底（见 normalize）。
+  language: detectSystemLanguage(),
   // 休息时怎么处理视频和音乐：none / video / all
   lockMediaMode: 'none',
   // 人离开电脑就重新计时
@@ -135,9 +138,11 @@ export function normalizeTimes(value) {
  *   enableMerge / mergeThreshold   不再做"合并提醒"
  *   focusSticky / autoFinish       柔和提醒现在恒为"确认才消失"
  *   maxSnoozeCount / maxSnooze     推迟恒为一次，不再是可配置的次数
- *   language / language_switch_hint  只剩中文
+ *   language_switch_hint           语言切换就是一个分段控件，不需要额外的提示字段
  *   checkUpdatesOnLaunch           本来就没有任何代码读它
  *   floatingWindow* ×13            悬浮窗子系统整个删了
+ *
+ * 注意：老的 `language` 字段**又被用上了** —— 校验见下面 normalize。
  */
 export function normalize(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -156,6 +161,11 @@ export function normalize(raw) {
   settings.silentAutoStart = settings.silentAutoStart !== false;
   settings.resetOnIdle = settings.resetOnIdle !== false;
   settings.lockScreenBgImage = String(settings.lockScreenBgImage || '');
+
+  // 语言只认 zh / en 这两个短码。老配置里存过 `zh-CN` 这种整串，会被兜成系统
+  // 语言 —— 那一版本来也只有中文，等于没损失（系统是中文的话结果还一样）。
+  settings.language =
+    settings.language === 'en' ? 'en' : settings.language === 'zh' ? 'zh' : detectSystemLanguage();
 
   if (!['none', 'video', 'all'].includes(settings.lockMediaMode)) {
     settings.lockMediaMode = 'none';
@@ -250,7 +260,7 @@ export function toBackendTasks() {
   return state.settings.tasks.map(task => ({
     id: task.id,
     title: titleOf(task),
-    desc: task.desc || BUILTIN[task.id]?.desc || '',
+    desc: task.desc || builtinTasks()[task.id]?.desc || '',
     interval: task.interval,
     enabled: task.enabled,
     icon: task.icon,

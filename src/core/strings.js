@@ -1,13 +1,21 @@
 /**
- * 全部界面文案。
+ * 全部界面文案（中文 / English）。
  *
- * 只有一个语言，所以不是 i18n —— 是一份集中可审的文案表。
- * 旧版满屏工程术语（合并阈值 / 空闲阈值 / 锁屏媒体处理 / 强制模式 /
- * 静默自启 / 调度方式 / 循环时间），全部换成人话。
+ * 两份表结构必须**完全一致**：键是同一批，函数键的参数也一致。少一个键不会报错，
+ * 只会在界面上留一块空白 —— 所以拿不准就两边都加。
+ *
+ * 切换语言走 `setLanguage()`：它重新赋值 `S`（`export let`），而 ESM 是活绑定，
+ * 所有 `import { S }` 的地方下次读 `S.xxx` 就是新语言。**代价是必须每次现读**：
+ * 谁把 `S.xxx` 提前解构到模块作用域（`const { noTasks } = S`），那个字符串就
+ * 永远停在启动时的语言。
+ *
+ * 注释保持中文：这是给维护者看的，不参与界面。翻译只做 `zh` / `en` 两张表。
  */
 
-export const S = {
-  // 中文名「缓缓」，英文名 Hold On。界面里只用中文名，英文名跟在这句后面当副标。
+/* ============================== 中文 ============================== */
+
+const zh = {
+  // 中文名「缓缓」，英文名 Hold On。
   appName: '缓缓',
   appTagline: '事缓则圆，不着急～',
 
@@ -64,8 +72,10 @@ export const S = {
   settingsTitle: '设置',
   groupBreak: '强制休息',
   groupGeneral: '声音与启动',
-  groupLook: '外观',
+  groupLook: '外观与语言',
   groupAbout: '关于',
+
+  language: '语言',
 
   mediaDuringBreak: '休息时怎么处理视频和音乐',
   mediaNone: '不处理',
@@ -131,6 +141,25 @@ export const S = {
   gatePass: '对上了，可以解除',
   gateDone: '解除休息',
   gateWaiting: '还没输完',
+  gatePlaceholder: '在这里一个字一个字打出来',
+
+  /* ---- 日程描述 ---- */
+  everyNMinutes: n => `每 ${n} 分钟`,
+  // 定点时间的连接符：中文用顿号，英文得用逗号加空格。
+  listSeparator: '、',
+  healthReminder: '健康提醒',
+  minutesShort: n => `${n} 分`,
+
+  /* ---- 无障碍标签（读屏软件会念出来，一样要翻）---- */
+  decrease: '减少',
+  increase: '增加',
+  collapse: '收起',
+  expand: '展开',
+  removeTime: time => `删除 ${time}`,
+
+  /* ---- 文件选择对话框里的类型名 ---- */
+  filterAudio: '音频',
+  filterImage: '图片',
 
   /* ---- 更新 ---- */
   // 本版**不做**自动下载安装：只问一句 GitHub 上有没有更新的 tag，
@@ -148,25 +177,238 @@ export const S = {
   toastNoTime: '先选一个时间',
   toastBadTime: '时间格式不对，像 22:00 或 2200 这样写',
   toastDupeTime: '这个时间已经加过了',
+  /** 强制休息期间按 Cmd+Q / 点托盘「退出」时的回执。挡是 Rust 挡的，这句只负责"别静默" */
+  exitBlockedLocked: '强制休息中，结束前不能退出',
 };
 
-/** 内置任务的标题与说明。用户改过之后就用用户自己的。 */
-export const BUILTIN = {
+/* ============================== English ============================== */
+
+const en = {
+  appName: 'Hold On',
+  appTagline: 'Slow down. No rush.',
+
+  /* ---- tabs ---- */
+  tabTasks: 'Reminders',
+  tabSettings: 'Settings',
+
+  /* ---- reminders page ---- */
+  tasksTitle: 'Reminders',
+  nextPrefix: 'Next',
+  noTasks: 'No reminders yet — add one',
+  paused: 'All paused',
+  idle: 'You stepped away — timers are paused',
+  notScheduled: 'Not scheduled',
+  addTask: 'Add reminder',
+  done: 'Done',
+  modeFocus: 'Floating popup',
+  modeLock: 'Forced full screen',
+  pauseAll: 'Pause all',
+  resumeAll: 'Resume all',
+  resetAll: 'Restart all timers',
+
+  /* ---- task editor ---- */
+  taskName: 'Name',
+  taskIcon: 'Icon',
+  taskSchedule: 'When to remind',
+  scheduleInterval: 'On an interval',
+  scheduleDaily: 'At fixed times',
+  taskInterval: 'Interval',
+  taskTimes: 'Times',
+  addTime: 'Add a time',
+  timePlaceholder: 'e.g. 22:00',
+  taskMode: 'Reminder style',
+  modeFocusHint: 'A small window in the middle of the screen, gone only after you confirm',
+  modeLockHint: 'Full screen forced break — you cannot leave early',
+  taskLockDuration: 'Break length',
+  taskPreNotify: 'Warn this many seconds before',
+  taskSnooze: 'Snooze length in minutes',
+  deleteTask: 'Delete this reminder',
+  deleteTaskConfirm: title => `Delete “${title}”? This cannot be undone.`,
+  newTaskTitle: 'New reminder',
+  minutes: 'minutes',
+  seconds: 'seconds',
+  hours: 'hours',
+  durationAuthHint: 'Anything over 10 minutes needs Touch ID or your password',
+
+  /* ---- settings page ---- */
+  settingsTitle: 'Settings',
+  groupBreak: 'Forced breaks',
+  groupGeneral: 'Sound & startup',
+  groupLook: 'Appearance & language',
+  groupAbout: 'About',
+
+  language: 'Language',
+
+  mediaDuringBreak: 'What to do with video and music during breaks',
+  mediaNone: 'Leave it alone',
+  mediaVideo: 'Pause video only',
+  mediaAll: 'Pause everything',
+  resetOnIdle: 'Restart timers when you step away',
+  resetOnIdleDesc: 'No point nagging you while you are not there',
+  idleThreshold: 'Count as away after',
+  soundEnabled: 'Sound',
+  customSound: 'Custom sound',
+  pickSound: 'Choose an audio file',
+  changeSound: 'Change',
+  testSound: 'Preview',
+  noCustomSound: 'System default',
+  autoStart: 'Launch at login',
+  autoStartDesc: 'Runs in the tray after you log in',
+  silentStart: 'Silent start',
+  silentStartDesc: 'No window on startup — it goes straight to the tray',
+  bgImage: 'Break background',
+  bgImageDesc: 'An image shown behind the forced break',
+  pickImage: 'Choose an image',
+  changeImage: 'Change',
+  clearImage: 'No background image',
+  version: v => `Version ${v}`,
+  checkUpdate: 'Check for updates',
+
+  aboutAuthor: 'About the author',
+  authorName: 'ZhuanTou',
+  authorProject: 'Repository',
+  authorHome: 'GitHub profile',
+  quickStar: 'Star the project',
+  quickStarDesc: 'If this helped you, drop a star on GitHub',
+  quickStarAction: 'Star it',
+  toastStarHint: 'Click ⭐ Star at the top right of the page that just opened',
+
+  /* ---- floating popup ---- */
+  reminderConfirm: 'Got it',
+  reminderSnooze: n => `Remind me again in ${n} min`,
+
+  /* ---- forced break ---- */
+  lockKicker: 'Time to rest',
+  lockRemaining: 'Remaining',
+  lockFinish: 'Finish break',
+  lockSnooze: minutes => `Snooze ${minutes} min`,
+  lockSnoozeOnce: 'Only once — the break starts over when the snooze ends',
+  lockEmergency: 'Emergency — I need to keep using the computer',
+  lockGateTitle: 'Type the text below to unlock',
+
+  /* ---- gate ---- */
+  gateHint: 'This exit is deliberately hard. Pasting does not work — every character must be typed.',
+  gateProgress: (matched, total) => `${matched} / ${total} typed`,
+  gateWrong: 'This character does not match',
+  gatePass: 'Matched — you can unlock',
+  gateDone: 'End the break',
+  gateWaiting: 'Not finished yet',
+  gatePlaceholder: 'Type it here, one character at a time',
+
+  /* ---- schedule description ---- */
+  everyNMinutes: n => (Number(n) === 1 ? 'Every minute' : `Every ${n} minutes`),
+  listSeparator: ', ',
+  healthReminder: 'Health reminders',
+  minutesShort: n => `${n}m`,
+
+  /* ---- accessibility labels ---- */
+  decrease: 'Decrease',
+  increase: 'Increase',
+  collapse: 'Collapse',
+  expand: 'Expand',
+  removeTime: time => `Remove ${time}`,
+
+  /* ---- file dialog type names ---- */
+  filterAudio: 'Audio',
+  filterImage: 'Images',
+
+  /* ---- updates ---- */
+  updateLatest: 'You are on the latest version',
+  updateAvailable: v => `Version ${v} is available — take a look`,
+  updateFail: 'Could not check for updates — check your connection',
+
+  /* ---- Touch ID / password ---- */
+  authReason: 'Change break length',
+  authFail: 'Not verified — the length was not changed',
+
+  /* ---- toasts ---- */
+  toastDeleted: 'Deleted',
+  toastNoTime: 'Pick a time first',
+  toastBadTime: 'Bad time format — write it like 22:00 or 2200',
+  toastDupeTime: 'That time is already in the list',
+  exitBlockedLocked: 'A forced break is running — you cannot quit until it ends',
+};
+
+/* ============================== 切换机制 ============================== */
+
+/** 界面里给用户选的语言。名字用它自己的语言写，两种界面下都一样。 */
+export const LANGUAGES = [
+  { id: 'zh', label: '中文' },
+  { id: 'en', label: 'English' },
+];
+
+const TABLES = { zh, en };
+
+/**
+ * 两张表本身。**界面代码不要用它** —— 界面一律读 `S`（活绑定，跟着语言走）。
+ * 它导出只为给 `scripts/check-i18n.mjs` 做键对齐检查：少一个键在英文界面下
+ * 是静默空白，不看这张表发现不了。
+ */
+export const STRINGS = TABLES;
+
+let current = 'zh';
+
+/**
+ * 当前语言的文案表。
+ *
+ * `export let` 是刻意的：ESM 的活绑定让 `S = en` 能被所有 import 方看见。
+ * 换成"永远导出同一个对象、只改它的键"也能达到同样效果，但那样少一个键就会
+ * 静默残留旧语言 —— 整体换表更不容易出这种半截状态。
+ */
+export let S = zh;
+
+export function setLanguage(lang) {
+  current = TABLES[lang] ? lang : 'zh';
+  S = TABLES[current];
+  return current;
+}
+
+export function currentLanguage() {
+  return current;
+}
+
+/** 系统语言 → 我们的两种。非 zh 一律 en。 */
+export function detectSystemLanguage() {
+  const raw = (typeof navigator !== 'undefined' && (navigator.language || navigator.languages?.[0])) || '';
+  return String(raw).toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+
+/** 我们的短码 → Rust 侧认的完整 tag（那边按 `== "en-US"` 判英文）。 */
+export function languageTag(lang) {
+  return lang === 'en' ? 'en-US' : 'zh-CN';
+}
+
+/* ============================== 内置任务 ============================== */
+
+/** 内置任务的标题与说明。用户改过之后就用用户自己的（title/desc 非空）。 */
+const BUILTIN_ZH = {
   sit: { title: '久坐提醒', desc: '站起来活动一下，别连着坐太久' },
   water: { title: '喝水提醒', desc: '去接杯水，顺便走两步' },
   eye: { title: '护眼提醒', desc: '看看远处，让眼睛歇一会儿' },
 };
 
-export const BUILTIN_IDS = Object.keys(BUILTIN);
+const BUILTIN_EN = {
+  sit: { title: 'Stand up', desc: 'Get up and move around — do not sit for so long' },
+  water: { title: 'Drink water', desc: 'Grab a glass of water and walk a couple of steps' },
+  eye: { title: 'Rest your eyes', desc: 'Look into the distance and let your eyes rest' },
+};
+
+/** 当前语言下的内置任务表。用函数而不是常量：语言一换它就得跟着换。 */
+export function builtinTasks() {
+  return current === 'en' ? BUILTIN_EN : BUILTIN_ZH;
+}
+
+/** id 集合两种语言一样，所以这个可以是常量。 */
+export const BUILTIN_IDS = Object.keys(BUILTIN_ZH);
 
 export function taskTitle(task) {
   if (!task) return '';
   if (task.title) return task.title;
-  return BUILTIN[task.id]?.title || S.newTaskTitle;
+  return builtinTasks()[task.id]?.title || S.newTaskTitle;
 }
 
 export function taskDesc(task) {
   if (!task) return '';
   if (task.desc) return task.desc;
-  return BUILTIN[task.id]?.desc || '';
+  return builtinTasks()[task.id]?.desc || '';
 }

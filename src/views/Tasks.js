@@ -9,8 +9,8 @@ import {
   colorForIcon,
   icon,
   iconForTask,
+  iconLabel,
   TASK_ICON_GROUPS,
-  TASK_ICON_LABELS,
 } from '../ui/icons.js';
 import { state, isDaily, taskTitle, DURATION_UNITS, DURATION_MAX } from '../core/store.js';
 import { S } from '../core/strings.js';
@@ -117,7 +117,7 @@ function renderCard(task) {
         class: 'card-toggle',
         dataset: { act: 'expand-task', id: task.id },
         'aria-expanded': String(expanded),
-        'aria-label': expanded ? '收起' : '展开',
+        'aria-label': expanded ? S.collapse : S.expand,
       },
       icon('chevron', { size: 16 })
     )
@@ -184,7 +184,7 @@ function renderQuickIntervals(task) {
           dataset: { act: 'set-interval', id: task.id, value: String(minutes) },
           'aria-pressed': String(task.interval === minutes),
         },
-        `${minutes} 分`
+        S.minutesShort(minutes)
       )
     )
   );
@@ -270,8 +270,8 @@ function iconPicker(task) {
             role: 'radio',
             dataset: { act: 'set-icon', id: task.id, value: name, color: group.color },
             'aria-checked': String(current === name),
-            'aria-label': TASK_ICON_LABELS[name] || name,
-            title: TASK_ICON_LABELS[name] || name,
+            'aria-label': iconLabel(name),
+            title: iconLabel(name),
           },
           icon(name, { size: 18 })
         )
@@ -302,7 +302,7 @@ function timePicker(task) {
             {
               class: 'x',
               dataset: { act: 'drop-time', id: task.id, value: time },
-              'aria-label': `删除 ${time}`,
+              'aria-label': S.removeTime(time),
             },
             '×'
           )
@@ -451,7 +451,7 @@ function stepperFor(task, fieldName, min, max, unit) {
       'button',
       {
         dataset: { act: fieldName, id: task.id, delta: '-1' },
-        'aria-label': '减少',
+        'aria-label': S.decrease,
       },
       '−'
     ),
@@ -462,7 +462,7 @@ function stepperFor(task, fieldName, min, max, unit) {
       max: String(max),
       dataset: { act: fieldName, id: task.id, delta: '0' },
     }),
-    h('button', { dataset: { act: fieldName, id: task.id, delta: '1' }, 'aria-label': '增加' }, '+'),
+    h('button', { dataset: { act: fieldName, id: task.id, delta: '1' }, 'aria-label': S.increase }, '+'),
     h('span', { class: 'unit' }, unit)
   );
 }

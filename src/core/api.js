@@ -82,7 +82,10 @@ const real = {
   testCustomSound: path => invoke('test_custom_sound', { filePath: path }),
   notify: (title, body) => invoke('show_notification', { title, body }),
   pauseMedia: mode => invoke('pause_playing_media_sessions', { mode }),
+  resumeMedia: () => invoke('resume_playing_media_sessions'),
   updateTrayTooltip: tip => invoke('update_tray_tooltip', { tooltip: tip }),
+  // 托盘菜单和应用菜单的文案在 Rust 侧，语言一换得让那边也换一份。
+  updateTrayLanguage: language => invoke('update_tray_language', { language }),
 
   autostartEnabled: () => isEnabled(),
   autostartEnable: () => enable(),
@@ -167,7 +170,9 @@ export const api = {
   testCustomSound: path => safe(() => backend.testCustomSound(path)),
   notify: (title, body) => safe(() => backend.notify(title, body)),
   pauseMedia: mode => safe(() => backend.pauseMedia(mode)),
+  resumeMedia: () => safe(() => backend.resumeMedia()),
   updateTrayTooltip: tip => safe(() => backend.updateTrayTooltip(tip)),
+  updateTrayLanguage: language => safe(() => backend.updateTrayLanguage(language)),
 
   autostartEnabled: () => safe(() => backend.autostartEnabled(), false),
   autostartEnable: () => safe(() => backend.autostartEnable()),

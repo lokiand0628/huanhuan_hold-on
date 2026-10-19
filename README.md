@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.4-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.5-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -166,6 +166,19 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 ---
 
 ## 版本记录
+
+### v0.0.5 (2026-10-19)
+
+界面出双语了，并修掉一批只有手测才会暴露的问题。
+
+- **新增中文 / English 双语**：设置页「外观与语言」里切换，重启后保留；首次启动跟随系统语言。托盘菜单、顶部菜单栏、内置任务名、图标无障碍标签、文件选择框的类型名一并跟着翻。老配置里的 `language` 字段会被重新采纳，认不出就按系统语言。
+- **休息时暂停媒体：macOS 上真的能用了**。以前这一整块在 macOS 是空实现（直接 `Ok(false)`），而且前端**从来没有调用过** —— 设置里那个开关是纯装饰。现在分两层：有脚本接口的播放器（Music / Spotify / IINA / QuickTime）走 AppleScript 精确暂停，并且**只恢复我们暂停过的那几个**；其余的（浏览器里的视频等）用系统级广播覆盖。是否需要暂停、退出时该不该恢复，都靠公开的 CoreAudio 接口判断（连静音播放也算「正在输出」），不依赖任何私有 entitlement。
+  - 首次上锁会弹一次「自动化」授权（允许后才能控制对应播放器）；浏览器里的视频走广播，不需要授权。
+- **强制休息期间的退出，四条路一起堵**：Cmd+Q（自定义菜单项）、托盘「退出 / 重启」、以及**右键 Dock 图标 → 退出**（Quit Apple Event）。前两条被挡下时会弹一条提示，不再是「按了没反应」。
+  - 注销 / 关机 / 重启**刻意放行**：那属于「故意把整机收掉」，而且重新登录后 `lock.json` 会让强制继续。
+  - `kill -9`、`Cmd+Opt+Esc` 强制退出、活动监视器拦不住，也不打算拦 —— 那已经不是顺手能完成的事。
+- **主窗口能拖了**：顶部那条空白以前写的是 `-webkit-app-region: drag` —— 那是 Chromium 的私有属性，WKWebView 根本不认（实测 `CSS.supports('-webkit-app-region','drag')` 返回 false），所以从写下那天起就没生效过。现在改用 Tauri 的 `data-tauri-drag-region`。
+- **居中浮窗不再被反复推到前台**：同一条提醒重复投递时只 `show()`、不再抢焦点；兜底轮询从 1 秒放宽到 2.5 秒。
 
 ### v0.0.4 (2026-10-11)
 

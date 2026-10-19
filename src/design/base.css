@@ -119,21 +119,21 @@ select {
 /* ---------- 沉浸式标题栏 ---------- */
 
 /* 窗口用 Overlay 标题栏 + 隐藏标题（见 tauri.conf.json），红绿灯直接浮在内容上，
-   所以顶部要留一条空白给它们。这条空白同时是**唯一的窗口拖拽区** ——
-   Overlay 模式下系统不再提供可拖的标题栏，少了它窗口就拖不动。
-   只作用于主窗口：锁屏和居中浮窗走别的路由。 */
+   所以顶部要留一条空白给它们。这条空白同时是**唯一的窗口拖拽区**。
+   只作用于主窗口：锁屏和居中浮窗走别的路由。
+
+   拖拽本身**不在这里实现** —— 靠的是 DOM 上的 `data-tauri-drag-region`
+   属性（见 views/App.js），由 Tauri 注入的脚本转成原生 performDrag。
+   别写 `-webkit-app-region: drag`：那是 Chromium 私有属性，WKWebView 不认，
+   实测 CSS.supports('-webkit-app-region','drag') === false。 */
 body[data-route='main'] .titlebar {
   flex: none;
   height: 30px;
-  -webkit-app-region: drag;
 }
 
-/* 拖拽区会把子元素的鼠标事件一起吃掉，所以要显式把它们排除在外。
-   目前这条空白里没有控件，留着是为了以后往里放东西时不踩坑。 */
-body[data-route='main'] .titlebar button,
-body[data-route='main'] .titlebar input {
-  -webkit-app-region: no-drag;
-}
+/* 以后往这条空白里放按钮/输入框时不必额外声明：Tauri 的拖拽判定里
+   可点击元素默认阻断拖拽，只有显式写 data-tauri-drag-region="deep"
+   才会把它们一起算进拖拽区。 */
 
 /* ---------- 滚动条：细、低对比，别抢内容 ---------- */
 

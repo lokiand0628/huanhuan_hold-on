@@ -247,6 +247,17 @@ function makeViewState(record_) {
  */
 async function engage(built) {
   await api.setLockScreenActive(true);
+
+  // 先暂停媒体、再上锁：`enterLock` 里那次全屏 Space 切换会把 JS 掐住好几秒，
+  // 放它后面等于让"暂停"迟到一大截。暂停失败绝不能拦住强制本身，所以只记日志。
+  // 恢复不在这里配对 —— 统一走 Rust 的 `exit_lock_mode`，那是所有退出路径的
+  // 唯一收口（正常完成、推迟、看门狗强制收尾都经过它）。
+  try {
+    await api.pauseMedia(state.settings?.lockMediaMode);
+  } catch (err) {
+    console.warn('[lock] 暂停媒体失败，继续上锁', err);
+  }
+
   await api.enterLock({
     title: built.title,
     desc: built.desc,

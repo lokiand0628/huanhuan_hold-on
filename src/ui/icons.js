@@ -20,6 +20,7 @@
  *   - 用户改一次标题，图标就跟着变，看起来像坏了
  */
 import { svg } from './dom.js';
+import { currentLanguage } from '../core/strings.js';
 
 const ICONS = {
   /* ==================== 任务图标（Lucide，ISC） ==================== */
@@ -117,33 +118,46 @@ export const TASK_ICON_GROUPS = [
   { color: 'custom', icons: ['hand', 'heart-pulse', 'smile', 'sparkles'] },
 ];
 
-/** 中文名。只当 aria-label 用，界面上不显示 —— 图标本身就该自解释。 */
-export const TASK_ICON_LABELS = {
-  sunrise: '早起',
-  sun: '晒太阳',
-  'door-open': '出门走动',
-  'person-standing': '起身',
-  flame: '运动',
-  timer: '番茄钟',
-  'glass-water': '喝水',
-  milk: '牛奶',
-  apple: '水果',
-  salad: '轻食',
-  utensils: '吃饭',
-  pill: '吃药',
-  coffee: '咖啡',
-  bath: '洗澡',
-  eye: '护眼',
-  wind: '深呼吸',
-  brain: '放空',
-  moon: '睡觉',
-  'moon-star': '早睡',
-  bed: '上床',
-  hand: '手部',
-  'heart-pulse': '心率',
-  smile: '心情',
-  sparkles: '自定义',
+/**
+ * 图标名 `[中文, English]`。只当 aria-label / title 用，界面上不显示 ——
+ * 图标本身就该自解释。
+ *
+ * 用数组不用 `{zh, en}`：这里只有两门语言，而且**顺序固定**，
+ * 多一层键名只会让 24 行变成 48 行。
+ */
+const TASK_ICON_LABELS = {
+  sunrise: ['早起', 'Early rise'],
+  sun: ['晒太阳', 'Sunlight'],
+  'door-open': ['出门走动', 'Step outside'],
+  'person-standing': ['起身', 'Stand up'],
+  flame: ['运动', 'Exercise'],
+  timer: ['番茄钟', 'Pomodoro'],
+  'glass-water': ['喝水', 'Water'],
+  milk: ['牛奶', 'Milk'],
+  apple: ['水果', 'Fruit'],
+  salad: ['轻食', 'Light meal'],
+  utensils: ['吃饭', 'Meal'],
+  pill: ['吃药', 'Medicine'],
+  coffee: ['咖啡', 'Coffee'],
+  bath: ['洗澡', 'Shower'],
+  eye: ['护眼', 'Eye rest'],
+  wind: ['深呼吸', 'Breathe'],
+  brain: ['放空', 'Unplug'],
+  moon: ['睡觉', 'Sleep'],
+  'moon-star': ['早睡', 'Early night'],
+  bed: ['上床', 'Go to bed'],
+  hand: ['手部', 'Hands'],
+  'heart-pulse': ['心率', 'Heart rate'],
+  smile: ['心情', 'Mood'],
+  sparkles: ['自定义', 'Custom'],
 };
+
+/** 图标的可读名字，按当前语言取。认不出就原样返回图标名，别让读屏软件念空。 */
+export function iconLabel(name) {
+  const pair = TASK_ICON_LABELS[name];
+  if (!pair) return name;
+  return currentLanguage() === 'en' ? pair[1] : pair[0];
+}
 
 /** 图标 → 身份色。反查表，由上面的分组生成，别手工维护第二份。 */
 const ICON_COLOR = {};
