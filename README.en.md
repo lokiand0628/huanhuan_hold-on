@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.5-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.6-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -254,6 +254,26 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.6 (2026-10-19)
+
+Close the window and it drops back to the menu bar.
+
+- **The app no longer keeps a Dock icon once the main window is closed.** Previously,
+  as soon as you had opened the window once it stayed a regular app with a Dock icon —
+  and right-clicking that icon gives you "Quit", which was a back door around the exit
+  guard added in 0.0.5. The Dock icon now follows the main window: present while the
+  window is open, gone once it is tucked away in the menu bar
+  (`NSApplication.setActivationPolicy` switching between `Regular` and `Accessory`).
+  - A silent login launch is now genuinely menu-bar-only. It never actually was — the
+    icon was there all along, just easy to miss while no window was showing.
+  - Bringing the window back from the tray brings the Dock icon back with it; otherwise
+    you would have a visible window with no Dock icon and no menu bar, which looks broken.
+  - **During a forced break the Dock icon is deliberately kept.** The lock needs a
+    full-screen Space, and accessory apps and full-screen Spaces have always been an
+    unreliable combination on macOS — the forced break is the one feature that must not
+    break, so it is not worth gambling a Dock icon on it. Right-click → Quit is still
+    blocked there.
 
 ### v0.0.5 (2026-10-19)
 

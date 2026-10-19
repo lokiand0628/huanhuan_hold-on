@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.5-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.6-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -166,6 +166,15 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 ---
 
 ## 版本记录
+
+### v0.0.6 (2026-10-19)
+
+关掉窗口就退回菜单栏，不再占着程序坞。
+
+- **主窗口关掉之后不再留在 Dock 里**：以前只要打开过一次窗口，它就一直是带 Dock 图标的常规 App —— 而 Dock 图标右键就是「退出」，等于给上一条修好的退出闸门留了个后门。现在窗口可见性直接决定 Dock 图标：窗口开着才有，收进托盘就没有（`NSApplication.setActivationPolicy` 在 `Regular` / `Accessory` 之间切）。
+  - 静默自启（开机跟随登录启动）本来就该只在菜单栏，现在是真的只有菜单栏 —— 之前它其实一直在 Dock 里，只是窗口没出现看不太出来。
+  - 从托盘重新唤起窗口时 Dock 图标会一起回来，否则窗口开着却没有 Dock 图标、也没有顶部菜单栏，看着像坏了。
+  - **强制休息期间刻意保留 Dock 图标**：锁屏要走全屏 Space，而 accessory 策略的 App 进全屏一直是 macOS 上不稳的组合 —— 锁屏是最不能坏的功能，不为省一个图标去赌它。那期间 Dock 右键「退出」照样被拦。
 
 ### v0.0.5 (2026-10-19)
 

@@ -3230,11 +3230,41 @@ fn show_notification(app: tauri::AppHandle, title: String, body: String) -> Resu
         .map_err(|e| e.to_string())
 }
 
+/// 主窗口可见 ↔ Dock 图标可见。
+///
+/// 关掉窗口之后不该继续赖在 Dock 里：一来常驻菜单栏的 App 惯例如此，二来
+/// **Dock 图标右键就是「退出」** —— 那正是刚堵掉的那条反射性出口的另一半，
+/// 留着它等于绕开闸门。窗口打开时再放回去，行为才一致：否则从托盘唤起窗口后
+/// 既没有 Dock 图标、也没有顶部菜单栏，用的人会以为它坏了。
+///
+/// 静默自启（`--silent`）时窗口本来就不显示，所以启动即无 Dock 图标。
+#[cfg(target_os = "macos")]
+fn set_dock_icon_visible(app: &AppHandle, visible: bool) {
+    if let Err(err) = app.set_dock_visibility(visible) {
+        eprintln!("[dock] 切换 Dock 图标失败: {err}");
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_dock_icon_visible(_app: &AppHandle, _visible: bool) {}
+
+/// 按主窗口**当前**的可见性校正一次。给那些「窗口可能被隐藏、也可能没有」的
+/// 收口处用（退出锁屏、外部唤起）：读实际状态比在每个分支里手工判断可靠。
+fn sync_dock_icon(app: &AppHandle) {
+    let visible = app
+        .get_webview_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+    set_dock_icon_visible(app, visible);
+}
+
 #[tauri::command]
 fn show_main_window(app: AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "main window not found".to_string())?;
+    // 先把 Dock 图标放回去、再显示窗口。反过来窗口会先出现、图标后到，看着像闪了一下。
+    set_dock_icon_visible(&app, true);
     window.unminimize().map_err(|e| e.to_string())?;
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
@@ -3244,6 +3274,8 @@ fn show_main_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 fn hide_main_window(window: tauri::Window) {
     let _ = window.hide();
+    // 收进托盘之后就不该再占着 Dock —— Cmd+W 关掉主窗口走的就是这条路。
+    set_dock_icon_visible(window.app_handle(), false);
 }
 
 #[tauri::command]
@@ -3414,6 +3446,12 @@ async fn enter_lock_mode(
         .get_webview_window("main")
         .ok_or_else(|| "main window not found".to_string())?;
 
+    // 强制锁期间要**有** Dock 图标：窗口要走全屏 Space，而 accessory 策略的 App
+    // 进全屏 Space 一直是 macOS 上出了名不稳的组合 —— 锁屏是最不能坏的功能，
+    // 不为省一个 Dock 图标去赌它。退出时 sync_dock_icon 会把图标收回托盘。
+    // 顺带一提：这里的 Dock 图标右键「退出」照样被 terminate_guard 挡着。
+    set_dock_icon_visible(&app, true);
+
     let _ = window.unminimize();
     let _ = window.show();
     let _ = window.set_fullscreen(true);
@@ -3505,6 +3543,10 @@ fn exit_lock_mode(app: tauri::AppHandle, state: State<LockState>, restore_visibl
             let _ = window.set_focus();
         }
     }
+
+    // 锁屏结束有两种收尾：`restore_visible` 为真就留着窗口（Dock 图标也留着），
+    // 为假就藏回托盘（Dock 图标一起收）。读实际可见性来定，比在这儿再分一次支可靠。
+    sync_dock_icon(&app);
 
     let mut state_guard = state.0.lock().unwrap();
     state_guard.active = false;
@@ -3802,11 +3844,9 @@ pub fn run() {
                 return;
             }
 
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            // 用户在别处双击了 App（非静默）→ 把窗口和 Dock 图标一起带回来。
+            // 统一走 show_main_window，Dock 那一步才不会漏。
+            let _ = show_main_window(app.clone());
         }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
@@ -3922,11 +3962,9 @@ pub fn run() {
                             app.restart();
                         }
                     } else if id_str == "show" {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.unminimize();
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        // 走 show_main_window 而不是自己 show：Dock 图标那一步
+                        // 只在那一个地方做，别的入口才不会漏。
+                        let _ = show_main_window(app.clone());
                     } else if id_str == "reset" {
                         let _ = app.emit("reset-all-tasks", ());
                     } else if id_str == "pause" {
@@ -3987,6 +4025,15 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             start_session_monitor(app.handle().clone());
 
+            // 初始状态：主窗口在 tauri.conf.json 里是 `visible: false` 起的，
+            // 所以**开机自启（--silent）时一开始就不该有 Dock 图标**。
+            // 手动启动时前端很快会调 show_main_window 把它放回来，
+            // 中间那一下可以忽略，人眼看不到。
+            //
+            // 注意别改成"先按 --silent 判断"：窗口可见性才是唯一真源，
+            // 而这个函数读的正是它。
+            sync_dock_icon(app.handle());
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -3997,6 +4044,8 @@ pub fn run() {
                 if window.label() == "main" {
                     api.prevent_close();
                     let _ = window.hide();
+                    // 主窗口收起来了 → Dock 图标也收起来（Cmd+W 走的正是这里）。
+                    set_dock_icon_visible(window.app_handle(), false);
                 } else if window.label() == "reminder" {
                     // 居中浮窗也要挡住反射性的 Cmd+W —— 否则"必须点确认才消失"
                     // 就是一句空话。`closable(false)` 管不到键盘快捷键，这里才行。
@@ -4020,11 +4069,8 @@ pub fn run() {
                 }
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.unminimize();
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    }
+                    // 点 Dock 图标 / 重新打开 App：窗口和 Dock 图标一起回来。
+                    let _ = show_main_window(app_handle.clone());
                 }
                 _ => {}
             }
