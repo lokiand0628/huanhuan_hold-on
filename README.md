@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.6-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.7-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -166,6 +166,11 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 ---
 
 ## 版本记录
+
+### v0.0.7 (2026-10-19)
+
+- **Dock 图标的切换加了一道闸**：`set_dock_visibility` 底下是老的、**异步**的 `TransformProcessType`，tao 自己的注释就写着「短时间内 Hide → Show 会触发 macOS 的 bug」。现在只在状态真的变化时才调它，并且**手动启动不再「先藏后显」**——那正好是间隔最短的一次来回。静默自启仍然是启动即无 Dock 图标。
+- **发布说明改中英双语**：Release 页面同时给中文和 English 用户看，不用再靠中文猜。
 
 ### v0.0.6 (2026-10-19)
 

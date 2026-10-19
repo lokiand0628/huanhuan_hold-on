@@ -74,6 +74,32 @@ jobs:
             ### 完整更新说明
 
             见 [README](https://github.com/${{ github.repository }}#版本记录)。
+
+            ---
+
+            ## Hold On ${{ github.ref_name }}
+
+            macOS (Apple Silicon) only. Download the `.dmg` below, open it, and drag
+            “Hold On” (the bundle is named 缓缓) into Applications.
+
+            The interface ships in **Chinese and English** — switch it in
+            Settings → Appearance & language; the first launch follows your system language.
+
+            ### Gatekeeper blocks the first launch
+
+            The bundle is neither signed with an Apple Developer certificate nor notarised,
+            so the first launch says the developer cannot be verified. Run this once:
+
+            ```bash
+            xattr -dr com.apple.quarantine /Applications/缓缓.app
+            ```
+
+            Or right-click the app in Finder → Open → Open again.
+
+            ### Full changelog
+
+            See the [English README](https://github.com/${{ github.repository }}/blob/main/README.en.md#version-history)
+            or the [Chinese README](https://github.com/${{ github.repository }}#版本记录).
           releaseDraft: false
           prerelease: false
           # createUpdaterArtifacts 已关（见 tauri.conf.json），所以不需要

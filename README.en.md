@@ -3,7 +3,7 @@
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.6-orange?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.7-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -254,6 +254,16 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.7 (2026-10-19)
+
+- **The Dock icon toggle now has a guard.** `set_dock_visibility` sits on top of the old,
+  *asynchronous* `TransformProcessType`, and tao's own source notes that a Hide → Show
+  within a very short window trips a macOS bug. The call is now made only when the state
+  actually changes, and a normal launch no longer hides-then-shows the icon — that was
+  the shortest possible round trip. A silent login launch still starts with no Dock icon.
+- **Release notes are bilingual now**, so the release page reads properly in both
+  languages instead of asking English readers to guess.
 
 ### v0.0.6 (2026-10-19)
 

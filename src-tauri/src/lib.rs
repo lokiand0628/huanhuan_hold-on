@@ -3237,11 +3237,22 @@ fn show_notification(app: tauri::AppHandle, title: String, body: String) -> Resu
 /// 留着它等于绕开闸门。窗口打开时再放回去，行为才一致：否则从托盘唤起窗口后
 /// 既没有 Dock 图标、也没有顶部菜单栏，用的人会以为它坏了。
 ///
-/// 静默自启（`--silent`）时窗口本来就不显示，所以启动即无 Dock 图标。
+/// **只在状态真的变化时才调底层 API**：Tauri 的 `set_dock_visibility` 底下是老的
+/// `TransformProcessType`，而 tao 自己的注释就写着它是**异步**的、并且
+/// 「短时间内 Hide → Show 会触发 macOS 的 bug」。窗口每次 show/hide 都会问一次，
+/// 不该每次都去动进程类型，所以这里记着上次设过的值，重复调用直接返回。
 #[cfg(target_os = "macos")]
 fn set_dock_icon_visible(app: &AppHandle, visible: bool) {
+    static DOCK_VISIBLE: AtomicBool = AtomicBool::new(true);
+
+    // swap 返回的是**旧值**：与要设的值相同就说明这是纯重复调用
+    if DOCK_VISIBLE.swap(visible, Ordering::SeqCst) == visible {
+        return;
+    }
     if let Err(err) = app.set_dock_visibility(visible) {
         eprintln!("[dock] 切换 Dock 图标失败: {err}");
+        // 没设成就把记录回滚，免得以后一直以为已经切过去了
+        DOCK_VISIBLE.store(!visible, Ordering::SeqCst);
     }
 }
 
@@ -4025,14 +4036,18 @@ pub fn run() {
             #[cfg(target_os = "windows")]
             start_session_monitor(app.handle().clone());
 
-            // 初始状态：主窗口在 tauri.conf.json 里是 `visible: false` 起的，
-            // 所以**开机自启（--silent）时一开始就不该有 Dock 图标**。
-            // 手动启动时前端很快会调 show_main_window 把它放回来，
-            // 中间那一下可以忽略，人眼看不到。
+            // 初始 Dock 图标：**只在静默自启时先藏起来**。
             //
-            // 注意别改成"先按 --silent 判断"：窗口可见性才是唯一真源，
-            // 而这个函数读的正是它。
-            sync_dock_icon(app.handle());
+            // 不能无脑用 sync_dock_icon（它读窗口可见性，而此刻窗口一定是隐藏的）——
+            // 那样手动启动时会先 Hide 再在两个 boot 之后 Show，正好撞上 tao 注释里
+            // 点名的「短时间 Hide → Show」：`set_dock_visibility` 底下是异步的
+            // `TransformProcessType`，这么来回切是不该做的事。
+            //
+            // `--silent` 恰好就是「这次启动不会显示窗口」的那个判据，所以用它。
+            #[cfg(target_os = "macos")]
+            if was_started_silent() {
+                set_dock_icon_visible(app.handle(), false);
+            }
 
             Ok(())
         })
