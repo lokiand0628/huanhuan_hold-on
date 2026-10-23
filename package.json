@@ -1,7 +1,8 @@
 {
   "name": "huanhuan-hold-on",
   "private": true,
-  "version": "0.0.7",
+  "version": "0.0.8",
+  "license": "GPL-3.0-only",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -352,10 +352,24 @@ fn get_timer_state() -> &'static Mutex<TimerState> {
 ///
 /// 注意：两个锁**依次**获取，不嵌套持有，避免与 watchdog 线程里的加锁顺序互相咬住。
 fn is_lock_active(app: &tauri::AppHandle) -> bool {
-    if app.state::<LockState>().0.lock().unwrap().active {
-        return true;
+    let in_memory = app.state::<LockState>().0.lock().unwrap().active
+        || get_timer_state().lock().unwrap().lock_screen_active;
+
+    if !in_memory {
+        return false;
     }
-    get_timer_state().lock().unwrap().lock_screen_active
+
+    // 内存里说锁着，但落盘凭据已经不在了 —— 说明这次休息**确实**结束了。
+    //
+    // `lock.json` 只有一个正常删除路径（`finishLock` → `clear_lock_state`，
+    // 以及 `exit_lock_mode` 的收尾）。`kill -9`、断电、重启都不会删它，那正是
+    // 它存在的意义。所以"文件没了"就等价于"休息结束了"，比进程里的标志位更可信。
+    //
+    // 必须有这一层：`exit_lock_mode` 只要有一环没走完（主线程窗口时序、
+    // webview 重载、mutex 中毒……），`active` / `lock_screen_active` 就会留在
+    // true 上。旧版没有兜底，症状是休息明明结束了，却再也退不出应用 ——
+    // 每次退出都被"强制休息中"挡住，只有重启进程才解得开。
+    get_lock_state_path().is_file()
 }
 
 fn enqueue_pending_trigger(state: &mut TimerState, payload: &TaskTriggeredPayload) {
@@ -2410,7 +2424,13 @@ fn enforce_main_lock_focus(app: &AppHandle) {
 }
 
 fn run_lock_watchdog_on_main_thread(app: &AppHandle, heal_windows: bool) {
-    let is_locked = get_timer_state().lock().unwrap().lock_screen_active;
+    // 除了 `lock_screen_active`，还要看落盘的锁在不在。
+    //
+    // 单看内存标志有过一个很难受的后果：标志位一旦残留成 true，watchdog 就会
+    // 把已经结束的锁屏一直顶到前台 —— 窗口被反复 show/抢焦点，用户既关不掉、
+    // 也退不出。`lock.json` 是唯一真相，它没了就不该再强制。
+    let is_locked =
+        get_timer_state().lock().unwrap().lock_screen_active && get_lock_state_path().is_file();
     if !is_locked {
         return;
     }
@@ -3259,16 +3279,6 @@ fn set_dock_icon_visible(app: &AppHandle, visible: bool) {
 #[cfg(not(target_os = "macos"))]
 fn set_dock_icon_visible(_app: &AppHandle, _visible: bool) {}
 
-/// 按主窗口**当前**的可见性校正一次。给那些「窗口可能被隐藏、也可能没有」的
-/// 收口处用（退出锁屏、外部唤起）：读实际状态比在每个分支里手工判断可靠。
-fn sync_dock_icon(app: &AppHandle) {
-    let visible = app
-        .get_webview_window("main")
-        .and_then(|window| window.is_visible().ok())
-        .unwrap_or(false);
-    set_dock_icon_visible(app, visible);
-}
-
 #[tauri::command]
 fn show_main_window(app: AppHandle) -> Result<(), String> {
     let window = app
@@ -3459,7 +3469,7 @@ async fn enter_lock_mode(
 
     // 强制锁期间要**有** Dock 图标：窗口要走全屏 Space，而 accessory 策略的 App
     // 进全屏 Space 一直是 macOS 上出了名不稳的组合 —— 锁屏是最不能坏的功能，
-    // 不为省一个 Dock 图标去赌它。退出时 sync_dock_icon 会把图标收回托盘。
+    // 不为省一个 Dock 图标去赌它。退出时按 `restore_visible` 收放图标。
     // 顺带一提：这里的 Dock 图标右键「退出」照样被 terminate_guard 挡着。
     set_dock_icon_visible(&app, true);
 
@@ -3467,8 +3477,17 @@ async fn enter_lock_mode(
     let _ = window.show();
     let _ = window.set_fullscreen(true);
     let _ = window.set_always_on_top(true);
-    let _ = window.set_closable(false);
-    let _ = window.set_minimizable(false);
+    // **不要调 `set_closable(false)` / `set_minimizable(false)`。**
+    //
+    // 那两句看着很对——锁屏期间当然不该让人点红绿灯——但 macOS 上它们改的是
+    // `NSWindowStyleMask`：把 Closable / Miniaturizable 两位摘掉，红绿灯就真的
+    // 被销毁，而不是变灰。退出锁屏时再加回来，时机恰好撞在全屏切换动画里，
+    // 系统会把这次改动丢掉。后果是永久性的：休息结束后，窗口左上角再也
+    // 没有关闭和最小化按钮，用户只能从托盘或 Dock 去关它。
+    //
+    // 拦「不让人关」这件事已经有专门的地方了：`CloseRequested` 里 prevent_close，
+    // 外加 Cmd+Q / 托盘退出 / Dock 退出的 `is_lock_active` 闸门。用事件拦，
+    // 不要去动窗口样式。
     let _ = window.set_focus();
 
     let monitors = window.available_monitors().unwrap_or_default();
@@ -3530,6 +3549,43 @@ async fn enter_lock_mode(
 #[tauri::command]
 fn exit_lock_mode(app: tauri::AppHandle, state: State<LockState>, restore_visible: Option<bool>) {
     let restore_visible = restore_visible.unwrap_or(false);
+
+    /* ---------------- 第一步：先把"强制"本身停掉 ---------------- */
+    //
+    // 窗口收尾放到后面。反过来做的话，watchdog 会在收尾的那几百毫秒里继续
+    // enforce：刚退出全屏的窗口又被顶回全屏、又被抢一次焦点，两边互相对抗，
+    // macOS 上就停在一个别扭的中间态 —— 红绿灯不出来、窗口关不掉。
+    // 先关掉两个开关，后面怎么动窗口都不会再有人插手。
+    //
+    // `timer_set_lock_screen_active` 是幂等的：前端在 `finishLock` 里已经调过
+    // 一次，这里再调一次是防止那一步没送达（前端报错、webview 重载……）。
+    timer_set_lock_screen_active(false);
+
+    {
+        let mut state_guard = state.0.lock().unwrap();
+        state_guard.active = false;
+        state_guard.generation = state_guard.generation.wrapping_add(1);
+    }
+
+    // 落盘凭据也先删。它是 `is_lock_active` 和 watchdog 的判定依据：
+    // 文件不在了，就等于"这次休息结束了"。走到这里说明休息确实完成
+    // （前端只在 finishLock 里调本命令）；`kill -9` 和断电不会经过这里 ——
+    // 那正是 `lock.json` 存在的意义。
+    let _ = fs::remove_file(get_lock_state_path());
+
+    /* ---------------- 第二步：关副屏 ---------------- */
+    {
+        let mut state_guard = state.0.lock().unwrap();
+        for label in state_guard.windows.iter() {
+            if let Some(w) = app.get_webview_window(label) {
+                let _ = w.close();
+            }
+        }
+        state_guard.windows.clear();
+        state_guard.args = None;
+    }
+
+    /* ---------------- 第三步：窗口收尾 ---------------- */
     let window = app.get_webview_window("main");
 
     // 退出强制就把**我们暂停过的**媒体放回去。挂后台线程：这里跑在主线程上，
@@ -3540,41 +3596,49 @@ fn exit_lock_mode(app: tauri::AppHandle, state: State<LockState>, restore_visibl
     });
 
     if let Some(window) = window {
+        // 顺序：先退出全屏，**再**决定窗口去留。
+        //
+        // 反过来（先 show/focus、再 set_fullscreen(false)）会撞上 macOS 的全屏
+        // 切换动画：动画还没跑完就把窗口拉回前台，它会被留在那个全屏 Space 里 ——
+        // 红绿灯不出现、窗口关不掉、Cmd+W 也没反应。用户看到的就是"休息结束了，
+        // 但我关不掉它"。所以退全屏放最前面，show/focus 挪到动画开始之后。
+        let _ = window.set_fullscreen(false);
+        let _ = window.set_always_on_top(false);
+
         if !restore_visible {
             let _ = window.hide();
         }
-
-        let _ = window.set_fullscreen(false);
-        let _ = window.set_always_on_top(false);
-        let _ = window.set_closable(true);
-        let _ = window.set_minimizable(true);
-
-        if restore_visible {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
     }
 
-    // 锁屏结束有两种收尾：`restore_visible` 为真就留着窗口（Dock 图标也留着），
-    // 为假就藏回托盘（Dock 图标一起收）。读实际可见性来定，比在这儿再分一次支可靠。
-    sync_dock_icon(&app);
+    // Dock 图标按**意图**设置，不去读 `is_visible()`。
+    //
+    // 全屏退出动画期间窗口会短暂报告"不可见"。那一刻去读可见性就会拿到 false，
+    // 然后 Dock 图标被收掉、进程切成 accessory —— 连带应用菜单栏一起消失，
+    // 之后没有任何地方会再把它们加回来。用入参决定，结果就是确定的。
+    set_dock_icon_visible(&app, restore_visible);
 
-    let mut state_guard = state.0.lock().unwrap();
-    state_guard.active = false;
-    state_guard.generation = state_guard.generation.wrapping_add(1);
-    for label in state_guard.windows.iter() {
-        if let Some(w) = app.get_webview_window(label) {
-            let _ = w.close();
-        }
-    }
-    state_guard.windows.clear();
-    state_guard.args = None;
-    drop(state_guard);
-
-    // 走到这里说明这次强制休息**正常完成了**（前端只在 finishLock 里调本命令）。
-    // 落盘状态必须一起清掉，否则下次启动会把一个已经结束的锁恢复出来。
-    // `kill -9` 和断电不会经过这里 —— 那正是 `lock.json` 存在的意义。
-    let _ = fs::remove_file(get_lock_state_path());
+    // 退出全屏是异步的。按钮样式和 show/focus 都挪到下一轮主线程再发，
+    // 让动画先跑起来。
+    //
+    // `set_closable` / `set_minimizable` 必须在这里补，不能在动画期间补 ——
+    // 上一版就是在动画里调的，macOS 直接丢弃，红绿灯再也没有回来。
+    // 这两个调用对"从没被改坏过"的窗口是幂等的；对已经坏掉的窗口是唯一的修复路径
+    // （0.0.7 及以前的版本在锁屏时把这两位摘掉了）。
+    let app_for_show = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(200));
+        let app_inner = app_for_show.clone();
+        let _ = app_for_show.run_on_main_thread(move || {
+            if let Some(window) = app_inner.get_webview_window("main") {
+                let _ = window.set_closable(true);
+                let _ = window.set_minimizable(true);
+                if restore_visible {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        });
+    });
 }
 
 /// macOS 顶部菜单栏。
@@ -4038,7 +4102,7 @@ pub fn run() {
 
             // 初始 Dock 图标：**只在静默自启时先藏起来**。
             //
-            // 不能无脑用 sync_dock_icon（它读窗口可见性，而此刻窗口一定是隐藏的）——
+            // 不能无脑按窗口可见性判断（此刻窗口一定是隐藏的）——
             // 那样手动启动时会先 Hide 再在两个 boot 之后 Show，正好撞上 tao 注释里
             // 点名的「短时间 Hide → Show」：`set_dock_visibility` 底下是异步的
             // `TransformProcessType`，这么来回切是不该做的事。
@@ -4058,6 +4122,12 @@ pub fn run() {
                 // Slave windows have "lock-slave-X".
                 if window.label() == "main" {
                     api.prevent_close();
+                    // 锁屏期间连「藏窗口」都不做：那等于开了一条视觉上的出口 ——
+                    // watchdog 下一秒又把窗口顶回来，屏幕上闪一下。强制靠事件层
+                    // 拦住就够了，不需要让窗口消失。
+                    if is_lock_active(window.app_handle()) {
+                        return;
+                    }
                     let _ = window.hide();
                     // 主窗口收起来了 → Dock 图标也收起来（Cmd+W 走的正是这里）。
                     set_dock_icon_visible(window.app_handle(), false);

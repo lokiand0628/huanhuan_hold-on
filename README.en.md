@@ -2,8 +2,8 @@
 
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.7-orange?style=flat-square" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.8-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -185,7 +185,7 @@ Built for minimal memory use and startup time:
 
 ## Download and install
 
-Grab `Huanhuan_0.0.4_aarch64.dmg` from
+Grab `Huanhuan_0.0.8_aarch64.dmg` from
 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases), open it and
 drag 缓缓 into Applications.
 
@@ -254,6 +254,33 @@ exchange for not having to keep a private key and not installing the wrong thing
 ---
 
 ## Version history
+
+### v0.0.8 (2026-10-23)
+
+Closes the dead end after a forced break — the window couldn't be closed and the app
+couldn't be quit — and relicenses the project under GPL-3.0.
+
+- **The traffic lights are back.** "No closing during a break" used to be implemented
+  with `set_closable(false)`, which on macOS clears an `NSWindowStyleMask` bit — the
+  buttons are **destroyed**, not greyed out. Restoring them on exit landed inside the
+  full-screen transition animation and was dropped by the system, so after **every**
+  forced break the close and minimize buttons were gone for good. Closing is now
+  intercepted in `CloseRequested` instead, and windows already in that state are
+  repaired on the next lock exit.
+- **A finished break actually lets you quit.** After `lock.json` was deleted the
+  in-memory "lock is active" flags sometimes stayed set (a webview reload during the
+  break, or a break that expired while the machine was off), so every quit was blocked
+  with "forced break in progress" until the process was restarted. `lock.json` is now
+  the single source of truth: no file, no lock. The watchdog stops pushing the window
+  forward on the same condition.
+- **Ordering on exit**: stop enforcement (clear both flags, delete the file) → close
+  slave windows → settle the main window. Restoring the buttons and bringing the window
+  forward now happen after the full-screen animation.
+- **The Dock icon follows intent**, not `is_visible()` — reading visibility mid-animation
+  returns `false`, which tucked the icon and the app menu away with no way back.
+- **Relicensed to GPL-3.0.** The upstream
+  [Health Reminder](https://github.com/kaima2022/Health-reminder) MIT portions are
+  preserved in [LICENSE-MIT](./LICENSE-MIT).
 
 ### v0.0.7 (2026-10-19)
 
@@ -420,10 +447,19 @@ This repository restarts numbering at 0.0.1; the full upstream changelog is in i
 
 ## License
 
-**MIT License**. Use, modify and distribute freely.
+**GNU General Public License v3.0** (GPL-3.0). Full text in [LICENSE](./LICENSE).
+
+- **Running it yourself, modifying it privately, using it inside a company**: no obligations.
+- **Distributing it at all** (selling, giving it away, publishing a build, offering a
+  download): you must ship the complete source code under the same GPL-3.0. Free of
+  charge still counts; charging money definitely counts.
+- **Want to ship it closed-source?** GPL does not offer that route. You would need a
+  separate written commercial license from the copyright holder.
 
 This project derives from [Health Reminder](https://github.com/kaima2022/Health-reminder)
-(MIT); the original copyright is held by 健康办公助手项目组. See [LICENSE](./LICENSE).
+(MIT); the original copyright for those parts is held by 健康办公助手项目组, and the MIT
+terms are preserved in [LICENSE-MIT](./LICENSE-MIT). The bundled Nunito font is under the
+SIL Open Font License — see [src/design/fonts/OFL.txt](./src/design/fonts/OFL.txt).
 
 ---
 

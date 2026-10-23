@@ -176,6 +176,29 @@ export async function armAfterRender() {
 }
 
 /**
+ * "这份 `lock.json` 已经不算数了"的统一收尾。
+ *
+ * **光删文件不够**，而旧版正是只删文件 —— 这就是那个死锁的来源：
+ *
+ *   锁屏期间 webview 被看门狗重载（或任何一次重新 boot）→ `restorePendingLock`
+ *   读到剩余时间已经归零 → 删掉 `lock.json` 就返回，界面回到主界面。可是 Rust
+ *   那边 `active` / `lock_screen_active` 还举着，窗口停在锁屏那个全屏 Space 里。
+ *
+ * 结果就是：休息明明结束了，红绿灯不出来、窗口关不掉，每次退出都被
+ * "强制休息中"挡回来，只有重启进程才解得开。
+ *
+ * 所以每一条"这锁不作数"的分支都必须走这里，把两侧一起收拾干净。
+ */
+async function abandonLock() {
+  record = null;
+  state.lock = null;
+  await api.setLockScreenActive(false);
+  // restore_visible=false：窗口交回托盘，随后 boot 会按正常启动逻辑决定要不要显示。
+  await api.exitLock(false);
+  await clearLock();
+}
+
+/**
  * 冷启动：读挂起的锁。返回是否恢复成功（失败一律放行，不锁死）。
  *
  * @param {object} options
@@ -192,19 +215,19 @@ export async function restorePendingLock({ allowUnarmed = false, engage: shouldE
     parsed = JSON.parse(raw);
   } catch {
     console.warn('[lock] lock.json 解析失败，按未上锁处理');
-    await clearLock();
+    if (!allowUnarmed) await abandonLock();
     return false;
   }
 
   if (parsed?.schema_version !== 1 || (!allowUnarmed && parsed?.armed !== true)) {
-    if (!allowUnarmed) await clearLock();
+    if (!allowUnarmed) await abandonLock();
     return false;
   }
 
   // 休息时间早就够了（比如关机放了一夜）—— 不必把人再关回去一次。
   // 副屏没有删文件的权限：那个决定只能由主屏来做。
   if (remainingSeconds(parsed) <= 0) {
-    if (!allowUnarmed) await clearLock();
+    if (!allowUnarmed) await abandonLock();
     return false;
   }
 
@@ -334,15 +357,24 @@ export async function rememberGate(matched) {
  */
 export async function finishLock() {
   stopHeartbeat();
+  const finished = record;
   record = null;
 
-  // 先解锁屏冻结，再删文件：两个循环都停下来之后，文件才没有意义
-  await api.setLockScreenActive(false);
-  await api.exitLock(true);
-  await clearLock();
-
-  state.lock = null;
-  notify();
+  // 先解锁屏冻结，再删文件：两个循环都停下来之后，文件才没有意义。
+  //
+  // `finally` 不是保险丝，是**必须**的收尾：`state.lock` 不清，界面就一直停在
+  // 锁屏上，而 Rust 那边的强制可能已经解除了 —— 用户看到的是一块点不动的死屏，
+  // 想退出又会被"强制休息中"挡住。任何一步出岔子，界面这一侧都要先放下。
+  try {
+    await api.setLockScreenActive(false);
+    await api.exitLock(true);
+  } catch (err) {
+    console.error('[lock] 退出强制失败', err, finished);
+  } finally {
+    await clearLock();
+    state.lock = null;
+    notify();
+  }
 }
 
 /** 退出前把闸门进度和最不利的检查点存下来 */

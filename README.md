@@ -2,8 +2,8 @@
 
 <p align="center">
   <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-blue?style=flat-square" alt="Platform"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License"></a>
-  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.7-orange?style=flat-square" alt="Version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/lokiand0628/huanhuan_hold-on/releases"><img src="https://img.shields.io/badge/Version-0.0.8-orange?style=flat-square" alt="Version"></a>
 </p>
 
 <p align="center">
@@ -113,9 +113,9 @@
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.4_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
+前往 [GitHub Releases](https://github.com/lokiand0628/huanhuan_hold-on/releases) 下载 `Huanhuan_0.0.8_aarch64.dmg`，打开后把「缓缓」拖进「应用程序」。
 
-（本地自己打包的话，产物名还是 `缓缓_0.0.4_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.4_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
+（本地自己打包的话，产物名还是 `缓缓_0.0.8_aarch64.dmg` —— 带中文名传上 GitHub 会被抹成 `_0.0.8_aarch64.dmg`，所以发布流程里改成了 ASCII 的。）
 
 ### 首次打开被 macOS 拦下怎么办
 
@@ -166,6 +166,16 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 ---
 
 ## 版本记录
+
+### v0.0.8 (2026-10-23)
+
+修掉「强制休息结束后关不掉、退不出」这个死结，许可证换成 GPL-3.0。
+
+- **红绿灯回来了**：锁屏期间「不许关窗口」以前是靠 `set_closable(false)` 实现的，而 macOS 上它摘的是窗口样式位 —— 红绿灯被**真的销毁**，不是变灰。退出锁屏时再加回来，时机又撞在全屏切换动画里，改动被系统丢掉。于是**每一次强制休息之后**，窗口左上角就永久没有关闭和最小化按钮，只能从托盘或 Dock 关。现在改成只在 `CloseRequested` 里拦，不再动窗口样式；已经坏掉的窗口会在下一次退出锁屏时自动修好。
+- **休息结束了就真能退出**：`lock.json` 删掉之后，后端内存里的「正在强制」标志有时没跟着复位（锁屏期间界面重载、开机时休息时间已过都会触发），于是每次退出都被「强制休息中」挡回来，只有重启进程才解得开。现在 `lock.json` 是唯一判据：文件不在了就放行，后台看门狗也不再往前面顶窗口。
+- **退出顺序理清**：先停强制（清两个标志 + 删文件）、再关副屏、最后收窗口；红绿灯恢复和窗口唤到前台都挪到全屏动画之后。
+- **Dock 图标按意图收放**，不再读窗口可见性 —— 全屏动画期间那一下读到的 `false` 会把图标和应用菜单一起收掉，而且再也回不来。
+- **许可证改为 GPL-3.0**。上游 [Health Reminder](https://github.com/kaima2022/Health-reminder) 的 MIT 部分保留在 [LICENSE-MIT](./LICENSE-MIT)。
 
 ### v0.0.7 (2026-10-19)
 
@@ -264,10 +274,16 @@ npm run tauri build -- --target aarch64-apple-darwin --bundles dmg
 
 ## 许可证
 
-本项目遵循 **MIT License**。您可以自由地使用、修改和分发。
+本项目遵循 **GNU General Public License v3.0**（GPL-3.0），完整条文见 [LICENSE](./LICENSE)。
+
+- **自己用、自己改、公司内部用**：随便用，没有义务。
+- **一旦对外分发**（卖、送、放上架、提供安装包下载）：必须把完整源代码以同样的
+  GPL-3.0 一并给出。不收钱也得给，收钱更得给。
+- **想闭源分发**：GPL 本身不提供这条路，只能另行向版权所有者取得书面商业授权。
 
 本项目源自 [Health Reminder](https://github.com/kaima2022/Health-reminder)（MIT），
-原始版权归「健康办公助手项目组」所有，详见 [LICENSE](./LICENSE)。
+该部分的原始版权归「健康办公助手项目组」所有，MIT 条款保留在 [LICENSE-MIT](./LICENSE-MIT)。
+内置字体 Nunito 使用 SIL Open Font License，见 [src/design/fonts/OFL.txt](./src/design/fonts/OFL.txt)。
 
 ---
 
